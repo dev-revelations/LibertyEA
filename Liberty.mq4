@@ -74,8 +74,12 @@ void OnTick()
   //     drawCross(time, price);
   //   }
   // }
-  MaDirection maDir = checkLowerMaChange(_Symbol, PERIOD_CURRENT);
-  Print("MaDir = " + (maDir == MA_UP ? "UP" : "Down"));
+
+  // MaDirection maDir = checkLowerMaChange(_Symbol, PERIOD_CURRENT);
+  // Print("MaDir = " + (maDir == MA_UP ? "UP" : "Down"));
+
+  bool maBreak = checkLowerMaBreak(_Symbol, PERIOD_CURRENT, ENV_BUY);
+  Print("MA Break = " + (maBreak == true ? "True" : "False"));
 }
 //+------------------------------------------------------------------+
 
@@ -187,7 +191,6 @@ MaDirection checkLowerMaChange(string symbol, ENUM_TIMEFRAMES lower_tf, int scan
   int lastLine = 1;
 
   int i = limit - 2;
-  // int limit = ;
 
   MaDirection result = MA_NONE;
   int lastChangeShift = -1;
@@ -263,6 +266,18 @@ MaDirection checkLowerMaChange(string symbol, ENUM_TIMEFRAMES lower_tf, int scan
   return result;
 }
 
+bool checkLowerMaBreak(string symbol, ENUM_TIMEFRAMES lower_tf, OrderEnvironment orderEnv)
+{
+  double MA_10 = getMA(symbol, lower_tf, 10, 0);
+  double mode = orderEnv == ENV_BUY ? MODE_ASK : MODE_BID;
+  double price = MarketInfo(symbol, mode);
+
+  bool buyMaBreak = (orderEnv == ENV_BUY && price > MA_10);
+
+  bool sellMaBreak = (orderEnv == ENV_SELL && price < MA_10);
+
+  return buyMaBreak || sellMaBreak;
+}
 //+------------------------------------------------------------------+
 //|                                                                  |
 //+------------------------------------------------------------------+
