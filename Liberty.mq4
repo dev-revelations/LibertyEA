@@ -17,6 +17,13 @@ enum OrderEnvironment
   ENV_SELL
 };
 
+enum MaDirection
+{
+  MA_NONE,
+  MA_UP,
+  MA_DOWN
+};
+
 struct HigherTFCrossCheckResult
 {
   OrderEnvironment orderEnvironment;
@@ -55,19 +62,20 @@ void OnTick()
 {
   //---
 
-  HigherTFCrossCheckResult maCross = findHigherTimeFrameMACross(_Symbol, higher_timeframe);
-  if (maCross.found)
-  {
+  // HigherTFCrossCheckResult maCross = findHigherTimeFrameMACross(_Symbol, higher_timeframe);
+  // if (maCross.found)
+  // {
+  //   int areaTouchShift = findAreaTouch(_Symbol, higher_timeframe, maCross.orderEnvironment, maCross.crossCandleShift, PERIOD_CURRENT);
 
-    int areaTouchShift = findAreaTouch(_Symbol, higher_timeframe, maCross.orderEnvironment, maCross.crossCandleShift, PERIOD_CURRENT);
-
-    if (areaTouchShift >= 0)
-    {
-      datetime time = iTime(_Symbol, PERIOD_CURRENT, areaTouchShift);
-      double price = iOpen(_Symbol, PERIOD_CURRENT, areaTouchShift);
-      drawCross(time, price);
-    }
-  }
+  //   if (areaTouchShift >= 0)
+  //   {
+  //     datetime time = iTime(_Symbol, PERIOD_CURRENT, areaTouchShift);
+  //     double price = iOpen(_Symbol, PERIOD_CURRENT, areaTouchShift);
+  //     drawCross(time, price);
+  //   }
+  // }
+  MaDirection maDir = checkLowerMaChange(_Symbol, PERIOD_CURRENT);
+  Print("MaDir = " + (maDir == MA_UP ? "UP" : "Down"));
 }
 //+------------------------------------------------------------------+
 
@@ -165,6 +173,94 @@ int findAreaTouch(string symbol, ENUM_TIMEFRAMES higherTF, OrderEnvironment orde
   }
 
   return -1;
+}
+
+MaDirection checkLowerMaChange(string symbol, ENUM_TIMEFRAMES lower_tf, int scanRange = 200)
+{
+  const int limit = scanRange + 1;
+  double LineUp[200], LineDown[200];
+  ArrayResize(LineUp, limit);
+  ArrayFill(LineUp, 0, limit - 1, -1);
+  ArrayResize(LineDown, limit);
+  ArrayFill(LineDown, 0, limit - 1, -1);
+
+  int lastLine = 1;
+
+  int i = limit - 2;
+  // int limit = ;
+
+  MaDirection result = MA_NONE;
+  int lastChangeShift = -1;
+
+  // Before current candle means the change in color is being fixed
+  while (i >= 1)
+  {
+    double MA_0 = getMA(symbol, lower_tf, 10, i),
+           MA_2 = getMA(symbol, lower_tf, 10, i + 1);
+
+    int lastLineTemp = lastLine;
+    if (MA_0 >= MA_2)
+    {
+      LineUp[i] = MA_0;
+      LineUp[i + 1] = MA_2;
+      lastLine = 1;
+    }
+
+    if (MA_0 <= MA_2)
+    {
+      LineDown[i] = MA_0;
+      LineDown[i + 1] = MA_2;
+      lastLine = 2;
+    }
+
+    if (lastLine == 1)
+    {
+      LineUp[i] = MA_0;
+    }
+    else
+    {
+      LineDown[i] = MA_0;
+    }
+
+    i--;
+  }
+
+  if (LineUp[1] != -1 && LineDown[1] == -1)
+  {
+    result = MA_UP;
+  }
+
+  if (LineUp[1] == -1 && LineDown[1] != -1)
+  {
+    result = MA_DOWN;
+  }
+
+  // int lineToScan = LineUp[1] == -1 ? 1 : 2;
+
+  // for (int j = 1; j < limit; j++)
+  // {
+  //   if (lineToScan == 1 && LineUp[j] != -1)
+  //   {
+  //     result = MA_DOWN;
+  //     lastChangeShift = j;
+  //     break;
+  //   }
+
+  //   if (lineToScan == 2 && LineDown[j] != -1)
+  //   {
+  //     result = MA_UP;
+  //     lastChangeShift = j;
+  //     break;
+  //   }
+  // }
+
+  // if (lastChangeShift > -1)
+  // {
+  //   datetime time = iTime(_Symbol, PERIOD_CURRENT, lastChangeShift);
+  //   double price = iOpen(_Symbol, PERIOD_CURRENT, lastChangeShift);
+  //   drawCross(time, price);
+  // }
+  return result;
 }
 
 //+------------------------------------------------------------------+
