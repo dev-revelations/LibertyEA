@@ -19,7 +19,7 @@ enum OrderEnvironment
 
 struct HigherTFCrossCheckResult
 {
-  OrderEnvironment orderType;
+  OrderEnvironment orderEnvironment;
   datetime crossTime;
   double crossOpenPrice;
   int crossCandleShift;
@@ -58,7 +58,15 @@ void OnTick()
   HigherTFCrossCheckResult maCross = findHigherTimeFrameMACross(_Symbol, higher_timeframe);
   if (maCross.found)
   {
-    drawCross(maCross.crossTime, maCross.crossOpenPrice);
+
+    int areaTouchShift = findAreaTouch(_Symbol, higher_timeframe, maCross.orderEnvironment, maCross.crossCandleShift, PERIOD_CURRENT);
+
+    if (areaTouchShift >= 0)
+    {
+      datetime time = iTime(_Symbol, PERIOD_CURRENT, areaTouchShift);
+      double price = iOpen(_Symbol, PERIOD_CURRENT, areaTouchShift);
+      drawCross(time, price);
+    }
   }
 }
 //+------------------------------------------------------------------+
@@ -68,7 +76,7 @@ HigherTFCrossCheckResult findHigherTimeFrameMACross(string symbol, ENUM_TIMEFRAM
   HigherTFCrossCheckResult result;
 
   result.found = false;
-  result.orderType = ENV_NONE;
+  result.orderEnvironment = ENV_NONE;
 
   for (int i = 0; i < Bars - 1; i++)
   {
@@ -99,7 +107,7 @@ HigherTFCrossCheckResult findHigherTimeFrameMACross(string symbol, ENUM_TIMEFRAM
       // SELL
       // Alert("Sell");
 
-      result.orderType = ENV_SELL;
+      result.orderEnvironment = ENV_SELL;
       result.found = true;
       break;
     }
@@ -107,13 +115,56 @@ HigherTFCrossCheckResult findHigherTimeFrameMACross(string symbol, ENUM_TIMEFRAM
     {
       // BUY
       // Alert(MA5_current);
-      result.orderType = ENV_BUY;
+      result.orderEnvironment = ENV_BUY;
       result.found = true;
       break;
     }
   }
 
   return result;
+}
+
+bool isAreaTouched(string symbol, ENUM_TIMEFRAMES higherTF, OrderEnvironment orderEnv, int shift, ENUM_TIMEFRAMES lower_tf)
+{
+  int actualHigherShift = getShift(symbol, higherTF, shift);
+
+  if (actualHigherShift >= 0)
+  {
+    double h4_ma5 = getMA(symbol, higherTF, 5, actualHigherShift);
+    if (orderEnv == ENV_SELL)
+    {
+      double m5_high = iHigh(symbol, lower_tf, shift);
+      if (m5_high >= h4_ma5)
+      {
+        return true;
+      }
+    }
+
+    if (orderEnv == ENV_BUY)
+    {
+      double m5_low = iLow(symbol, lower_tf, shift);
+      if (m5_low <= h4_ma5)
+      {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+int findAreaTouch(string symbol, ENUM_TIMEFRAMES higherTF, OrderEnvironment orderEnv, int scanLimitShift, ENUM_TIMEFRAMES lower_tf)
+{
+
+  for (int i = scanLimitShift; i >= 0; i--)
+  {
+    bool touched = isAreaTouched(symbol, higherTF, orderEnv, i, lower_tf);
+    if (touched)
+    {
+      return i;
+    }
+  }
+
+  return -1;
 }
 
 //+------------------------------------------------------------------+
