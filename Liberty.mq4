@@ -8,8 +8,29 @@
 #property version "1.00"
 #property strict
 
-
 extern ENUM_TIMEFRAMES higher_timeframe = PERIOD_H4;
+
+enum OrderEnvironment
+{
+  ENV_NONE,
+  ENV_BUY,
+  ENV_SELL
+};
+
+struct HigherTFCrossCheckResult
+{
+  OrderEnvironment orderType;
+  datetime crossTime;
+  double crossOpenPrice;
+  int crossCandleShift;
+  ENUM_TIMEFRAMES crossCandleShiftTimeframe;
+  bool found;
+
+  HigherTFCrossCheckResult()
+  {
+  }
+};
+
 //+------------------------------------------------------------------+
 //| Expert initialization function                                   |
 //+------------------------------------------------------------------+
@@ -34,19 +55,28 @@ void OnTick()
 {
   //---
 
-  checkHigherTimeFrameMACross(_Symbol, higher_timeframe);
+  HigherTFCrossCheckResult maCross = findHigherTimeFrameMACross(_Symbol, higher_timeframe);
+  if (maCross.found)
+  {
+    drawCross(maCross.crossTime, maCross.crossOpenPrice);
+  }
 }
 //+------------------------------------------------------------------+
 
-void checkHigherTimeFrameMACross(string symbol, ENUM_TIMEFRAMES higherTF)
+HigherTFCrossCheckResult findHigherTimeFrameMACross(string symbol, ENUM_TIMEFRAMES higherTF)
 {
+  HigherTFCrossCheckResult result;
+
+  result.found = false;
+  result.orderType = ENV_NONE;
+
   for (int i = 0; i < Bars - 1; i++)
   {
 
     int actualShift = getShift(symbol, higherTF, i);
 
     if (actualShift < 0)
-      Alert("Shift Error");
+      Print("Shift Error");
 
     double MA5_current = getMA(symbol, higherTF, 5, actualShift);
     double MA5_prev = getMA(symbol, higherTF, 5, actualShift + 1);
@@ -55,25 +85,35 @@ void checkHigherTimeFrameMACross(string symbol, ENUM_TIMEFRAMES higherTF)
     double MA10_prev = getMA(symbol, higherTF, 10, actualShift + 1);
 
     // Only Current TimeFrame data
-    int higherTFBeginning = i + (int)(higherTF / Period()) - 1;
-    datetime currentShiftTime = iTime(symbol, PERIOD_CURRENT, higherTFBeginning);
-    double price = iOpen(symbol, PERIOD_CURRENT, higherTFBeginning);
+    int higherTFBeginningInCurrentPeriod = i + (int)(higherTF / Period()) - 1;
+    datetime currentShiftTime = iTime(symbol, PERIOD_CURRENT, higherTFBeginningInCurrentPeriod);
+    double price = iOpen(symbol, PERIOD_CURRENT, higherTFBeginningInCurrentPeriod);
+
+    result.crossOpenPrice = price;
+    result.crossTime = currentShiftTime;
+    result.crossCandleShift = higherTFBeginningInCurrentPeriod;
+    result.crossCandleShiftTimeframe = Period();
 
     if (MA5_prev > MA10_prev && MA5_current < MA10_current)
     {
       // SELL
       // Alert("Sell");
-      drawCross(currentShiftTime, price);
+
+      result.orderType = ENV_SELL;
+      result.found = true;
       break;
     }
     else if (MA5_prev < MA10_prev && MA5_current > MA10_current)
     {
       // BUY
       // Alert(MA5_current);
-      drawCross(currentShiftTime, price);
+      result.orderType = ENV_BUY;
+      result.found = true;
       break;
     }
   }
+
+  return result;
 }
 
 //+------------------------------------------------------------------+
@@ -95,7 +135,7 @@ double getMA(string symbol, ENUM_TIMEFRAMES timeframe, int periodMA, int shift, 
 int getShift(string symbol, ENUM_TIMEFRAMES timeframe, int shift)
 {
   datetime candleTimeCurrent = iTime(symbol, PERIOD_CURRENT, shift);
-  int actualShift = iBarShift(symbol, timeframe, candleTimeCurrent, true);
+  int actualShift = iBarShift(symbol, timeframe, candleTimeCurrent);
 
   return actualShift;
 }
