@@ -8,6 +8,8 @@
 #property version "1.00"
 #property strict
 
+#include <WinUser32.mqh>
+
 extern ENUM_TIMEFRAMES higher_timeframe = PERIOD_H4;
 
 enum OrderEnvironment
@@ -22,6 +24,16 @@ enum MaDirection
   MA_NONE,
   MA_UP,
   MA_DOWN
+};
+
+struct LowMaChangeResult
+{
+  MaDirection dir;
+  int lastChangeShift;
+
+  LowMaChangeResult()
+  {
+  }
 };
 
 struct HigherTFCrossCheckResult
@@ -62,24 +74,32 @@ void OnTick()
 {
   //---
 
-  // HigherTFCrossCheckResult maCross = findHigherTimeFrameMACross(_Symbol, higher_timeframe);
-  // if (maCross.found)
-  // {
-  //   int areaTouchShift = findAreaTouch(_Symbol, higher_timeframe, maCross.orderEnvironment, maCross.crossCandleShift, PERIOD_CURRENT);
+  HigherTFCrossCheckResult maCross = findHigherTimeFrameMACross(_Symbol, higher_timeframe);
+  if (maCross.found)
+  {
+    int firstAreaTouchShift = findAreaTouch(_Symbol, higher_timeframe, maCross.orderEnvironment, maCross.crossCandleShift, PERIOD_CURRENT);
 
-  //   if (areaTouchShift >= 0)
-  //   {
-  //     datetime time = iTime(_Symbol, PERIOD_CURRENT, areaTouchShift);
-  //     double price = iOpen(_Symbol, PERIOD_CURRENT, areaTouchShift);
-  //     drawCross(time, price);
-  //   }
-  // }
+    if (firstAreaTouchShift > 0)
+    {
 
-  // MaDirection maDir = checkLowerMaChange(_Symbol, PERIOD_CURRENT);
-  // Print("MaDir = " + (maDir == MA_UP ? "UP" : "Down"));
 
-  bool maBreak = checkLowerMaBreak(_Symbol, PERIOD_CURRENT, ENV_BUY);
-  Print("MA Break = " + (maBreak == true ? "True" : "False"));
+      int maDirChangeList[];
+
+      listLowMaDirChanges(maDirChangeList, _Symbol, PERIOD_CURRENT, maCross.orderEnvironment, firstAreaTouchShift);
+      int listSize = ArraySize(maDirChangeList);
+
+      ObjectsDeleteAll(0, OBJ_VLINE);
+      Print("firstAreaTouchShift = ", firstAreaTouchShift);
+      for (int i = 0; i < listSize; i++)
+      {
+        int maChangePoint = maDirChangeList[i];
+        Print("Change Point = ", maChangePoint);
+        datetime time = iTime(_Symbol, PERIOD_CURRENT, maChangePoint);
+        double price = iOpen(_Symbol, PERIOD_CURRENT, maChangePoint);
+        drawVLine(time, price, IntegerToString(maChangePoint));
+      }
+    }
+  }
 }
 //+------------------------------------------------------------------+
 
@@ -179,10 +199,46 @@ int findAreaTouch(string symbol, ENUM_TIMEFRAMES higherTF, OrderEnvironment orde
   return -1;
 }
 
-MaDirection checkLowerMaChange(string symbol, ENUM_TIMEFRAMES lower_tf, int scanRange = 200)
+void listLowMaDirChanges(int &list[], string symbol, ENUM_TIMEFRAMES lowTF, OrderEnvironment orderEnv, int firstAreaTouchShift)
+{
+  MaDirection maAnswer = MA_NONE;
+  if (orderEnv == ENV_SELL)
+  {
+    maAnswer = MA_DOWN;
+  }
+  else if (orderEnv == ENV_BUY)
+  {
+    maAnswer = MA_UP;
+  }
+
+  int itemCount = 0;
+  for (int i = firstAreaTouchShift - 1; i > 0; i--)
+  {
+    LowMaChangeResult maResult = getLowerMaDirection(symbol, lowTF, i, firstAreaTouchShift + 1);
+    if (maResult.dir == maAnswer)
+    {
+
+      // Baraye inke motmaen shavim taghire rang/jahate sahih anjam shode ast
+      LowMaChangeResult maPrevResult = getLowerMaDirection(symbol, lowTF, i + 1, firstAreaTouchShift + 1);
+      LowMaChangeResult maNextResult = getLowerMaDirection(symbol, lowTF, i - 1, firstAreaTouchShift + 1);
+      if (maPrevResult.dir != maAnswer && maNextResult.dir == maAnswer)
+      {
+        // To azvoid adding redundant data
+        int lastChangePoint = itemCount > 0 ? list[itemCount - 1] : -1;
+        if (maResult.lastChangeShift != lastChangePoint)
+        {
+          itemCount++;
+          ArrayResize(list, itemCount);
+          list[itemCount - 1] = maResult.lastChangeShift;
+        }
+      }
+    }
+  }
+}
+LowMaChangeResult getLowerMaDirection(string symbol, ENUM_TIMEFRAMES lower_tf, int startFromShift = 1, int scanRange = 200)
 {
   const int limit = scanRange + 1;
-  double LineUp[200], LineDown[200];
+  double LineUp[], LineDown[];
   ArrayResize(LineUp, limit);
   ArrayFill(LineUp, 0, limit - 1, -1);
   ArrayResize(LineDown, limit);
@@ -192,11 +248,12 @@ MaDirection checkLowerMaChange(string symbol, ENUM_TIMEFRAMES lower_tf, int scan
 
   int i = limit - 2;
 
-  MaDirection result = MA_NONE;
-  int lastChangeShift = -1;
+  LowMaChangeResult result;
+  result.dir = MA_NONE;
+  result.lastChangeShift = -1;
 
   // Before current candle means the change in color is being fixed
-  while (i >= 1)
+  while (i >= startFromShift)
   {
     double MA_0 = getMA(symbol, lower_tf, 10, i),
            MA_2 = getMA(symbol, lower_tf, 10, i + 1);
@@ -228,34 +285,34 @@ MaDirection checkLowerMaChange(string symbol, ENUM_TIMEFRAMES lower_tf, int scan
     i--;
   }
 
-  if (LineUp[1] != -1 && LineDown[1] == -1)
+  if (LineUp[startFromShift] != -1 && LineDown[startFromShift] == -1)
   {
-    result = MA_UP;
+    result.dir = MA_UP;
   }
 
-  if (LineUp[1] == -1 && LineDown[1] != -1)
+  if (LineUp[startFromShift] == -1 && LineDown[startFromShift] != -1)
   {
-    result = MA_DOWN;
+    result.dir = MA_DOWN;
   }
 
-  // int lineToScan = LineUp[1] == -1 ? 1 : 2;
+  int lineToScan = LineUp[startFromShift] == -1 ? 1 : 2;
 
-  // for (int j = 1; j < limit; j++)
-  // {
-  //   if (lineToScan == 1 && LineUp[j] != -1)
-  //   {
-  //     result = MA_DOWN;
-  //     lastChangeShift = j;
-  //     break;
-  //   }
+  for (int j = startFromShift; j < limit; j++)
+  {
+    if (lineToScan == 1 && LineUp[j] != -1)
+    {
+      // result.dir = MA_DOWN;
+      result.lastChangeShift = j;
+      break;
+    }
 
-  //   if (lineToScan == 2 && LineDown[j] != -1)
-  //   {
-  //     result = MA_UP;
-  //     lastChangeShift = j;
-  //     break;
-  //   }
-  // }
+    if (lineToScan == 2 && LineDown[j] != -1)
+    {
+      // result.dir = MA_UP;
+      result.lastChangeShift = j;
+      break;
+    }
+  }
 
   // if (lastChangeShift > -1)
   // {
@@ -269,7 +326,7 @@ MaDirection checkLowerMaChange(string symbol, ENUM_TIMEFRAMES lower_tf, int scan
 bool checkLowerMaBreak(string symbol, ENUM_TIMEFRAMES lower_tf, OrderEnvironment orderEnv)
 {
   double MA_10 = getMA(symbol, lower_tf, 10, 0);
-  double mode = orderEnv == ENV_BUY ? MODE_ASK : MODE_BID;
+  int mode = orderEnv == ENV_BUY ? MODE_ASK : MODE_BID;
   double price = MarketInfo(symbol, mode);
 
   bool buyMaBreak = (orderEnv == ENV_BUY && price > MA_10);
@@ -278,6 +335,7 @@ bool checkLowerMaBreak(string symbol, ENUM_TIMEFRAMES lower_tf, OrderEnvironment
 
   return buyMaBreak || sellMaBreak;
 }
+
 //+------------------------------------------------------------------+
 //|                                                                  |
 //+------------------------------------------------------------------+
@@ -321,6 +379,24 @@ void drawCross(datetime time, double price)
   ObjectSet(id2, OBJPROP_COLOR, clrAqua);
   //  }
 }
+
+void drawVLine(datetime time, double price, string id = "")
+{
+  string id2 = "liberty_v_" + id;
+
+  // ObjectDelete(id2);
+  ObjectCreate(id2, OBJ_VLINE, 0, time, price);
+  ObjectSet(id2, OBJPROP_COLOR, clrAqua);
+}
 //+------------------------------------------------------------------+
 
 //+------------------------------------------------------------------+
+void breakPoint()
+{
+  if (IsVisualMode() && IsTesting())
+  {
+    keybd_event(19, 0, 0, 0);
+    Sleep(100);
+    keybd_event(19, 0, 2, 0);
+  }
+}
