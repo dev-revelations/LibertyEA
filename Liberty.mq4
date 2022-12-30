@@ -331,7 +331,7 @@ LowMaChangeResult getLowerMaDirection(string symbol, ENUM_TIMEFRAMES lower_tf, i
     if (lineToScan == 1 && LineUp[j] != VALUE_NULL && LineDown[j] == VALUE_NULL)
     {
       // result.dir = MA_DOWN;
-      result.lastChangeShift = j - 1;
+      result.lastChangeShift = j - 2;
       break;
     }
 
