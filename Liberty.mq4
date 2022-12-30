@@ -82,18 +82,16 @@ void OnTick()
     if (firstAreaTouchShift > 0)
     {
 
-
       int maDirChangeList[];
 
       listLowMaDirChanges(maDirChangeList, _Symbol, PERIOD_CURRENT, maCross.orderEnvironment, firstAreaTouchShift);
       int listSize = ArraySize(maDirChangeList);
 
       ObjectsDeleteAll(0, OBJ_VLINE);
-      Print("firstAreaTouchShift = ", firstAreaTouchShift);
+
       for (int i = 0; i < listSize; i++)
       {
         int maChangePoint = maDirChangeList[i];
-        Print("Change Point = ", maChangePoint);
         datetime time = iTime(_Symbol, PERIOD_CURRENT, maChangePoint);
         double price = iOpen(_Symbol, PERIOD_CURRENT, maChangePoint);
         drawVLine(time, price, IntegerToString(maChangePoint));
@@ -237,6 +235,10 @@ void listLowMaDirChanges(int &list[], string symbol, ENUM_TIMEFRAMES lowTF, Orde
 }
 LowMaChangeResult getLowerMaDirection(string symbol, ENUM_TIMEFRAMES lower_tf, int startFromShift = 1, int scanRange = 200)
 {
+  const int VALUE_UP = 1;
+  const int VALUE_DOWN = 2;
+  const int VALUE_NULL = -1;
+  const int VALUE_BOTH = 3;
   const int limit = scanRange + 1;
   double LineUp[], LineDown[];
   ArrayResize(LineUp, limit);
@@ -259,57 +261,60 @@ LowMaChangeResult getLowerMaDirection(string symbol, ENUM_TIMEFRAMES lower_tf, i
            MA_2 = getMA(symbol, lower_tf, 10, i + 1);
 
     int lastLineTemp = lastLine;
-    if (MA_0 >= MA_2)
+    if (MA_0 > MA_2)
     {
-      LineUp[i] = MA_0;
-      LineUp[i + 1] = MA_2;
+      LineUp[i] = VALUE_UP;
+      LineUp[i + 1] = VALUE_BOTH;
       lastLine = 1;
     }
 
-    if (MA_0 <= MA_2)
+    if (MA_0 < MA_2)
     {
-      LineDown[i] = MA_0;
-      LineDown[i + 1] = MA_2;
+      LineDown[i] = VALUE_DOWN;
+      LineDown[i + 1] = VALUE_BOTH;
       lastLine = 2;
     }
 
+    // intersection
     if (lastLine == 1)
     {
-      LineUp[i] = MA_0;
+      LineUp[i] = VALUE_BOTH;
+      LineDown[i] = VALUE_NULL;
     }
     else
     {
-      LineDown[i] = MA_0;
+      LineDown[i] = VALUE_BOTH;
+      LineUp[i] = VALUE_NULL;
     }
 
     i--;
   }
 
-  if (LineUp[startFromShift] != -1 && LineDown[startFromShift] == -1)
+  if (LineUp[startFromShift] != VALUE_NULL && LineDown[startFromShift] == VALUE_NULL)
   {
     result.dir = MA_UP;
   }
 
-  if (LineUp[startFromShift] == -1 && LineDown[startFromShift] != -1)
+  if (LineUp[startFromShift] == VALUE_NULL && LineDown[startFromShift] != VALUE_NULL)
   {
     result.dir = MA_DOWN;
   }
 
-  int lineToScan = LineUp[startFromShift] == -1 ? 1 : 2;
+  int lineToScan = LineUp[startFromShift] == VALUE_NULL ? 1 : 2;
 
   for (int j = startFromShift; j < limit; j++)
   {
-    if (lineToScan == 1 && LineUp[j] != -1)
+    if (lineToScan == 1 && LineUp[j] != VALUE_NULL && LineDown[j] == VALUE_NULL)
     {
       // result.dir = MA_DOWN;
-      result.lastChangeShift = j;
+      result.lastChangeShift = j - 1;
       break;
     }
 
-    if (lineToScan == 2 && LineDown[j] != -1)
+    if (lineToScan == 2 && LineDown[j] != VALUE_NULL && LineUp[j] == VALUE_BOTH)
     {
       // result.dir = MA_UP;
-      result.lastChangeShift = j;
+      result.lastChangeShift = j - 1;
       break;
     }
   }
