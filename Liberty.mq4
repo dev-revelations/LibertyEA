@@ -87,36 +87,37 @@ void OnTick()
       listLowMaDirChanges(maDirChangeList, _Symbol, PERIOD_CURRENT, maCross.orderEnvironment, firstAreaTouchShift);
       int listSize = ArraySize(maDirChangeList);
 
-      ObjectsDeleteAll(0, OBJ_VLINE);
+      deleteObjectsAll();
 
       for (int i = 0; i < listSize; i++)
       {
         int maChangePoint = maDirChangeList[i];
-        drawVLine(maChangePoint, IntegerToString(maChangePoint));
+        // drawVLine(maChangePoint, IntegerToString(maChangePoint));
+        drawArrowObj(maChangePoint, maCross.orderEnvironment == ENV_BUY, IntegerToString(i));
 
         // 2 vahed check mishavad ta balatarin ya payintarin noghteye ehtemalie akhir peyda shavad
-        int highestLowestPrice = -1;
-        int highestLowestPrice1 = -1;
-        int highestLowestPrice2 = -1;
+        int highestLowestCandle = -1;
+        int highestLowestCandle1 = -1;
+        int highestLowestCandle2 = -1;
         int nextMaChangePoint1 = i < listSize - 1 ? maDirChangeList[i + 1] : 0;
         int currentToNextCount1 = MathAbs(maChangePoint - nextMaChangePoint1);
         int nextMaChangePoint2 = i < listSize - 2 ? maDirChangeList[i + 2] : 0;
         int currentToNextCount2 = MathAbs(maChangePoint - nextMaChangePoint2);
         if (maCross.orderEnvironment == ENV_SELL)
         {
-          highestLowestPrice1 = iLowest(_Symbol, PERIOD_CURRENT, MODE_LOW, currentToNextCount1, nextMaChangePoint1); // findLow(_Symbol, PERIOD_CURRENT, maChangePoint);
-          highestLowestPrice2 = iLowest(_Symbol, PERIOD_CURRENT, MODE_LOW, currentToNextCount2, nextMaChangePoint2);
-          highestLowestPrice = MathMin(highestLowestPrice1, highestLowestPrice2);
+          highestLowestCandle1 = iLowest(_Symbol, PERIOD_CURRENT, MODE_LOW, currentToNextCount1, nextMaChangePoint1); // findLow(_Symbol, PERIOD_CURRENT, maChangePoint);
+          highestLowestCandle2 = iLowest(_Symbol, PERIOD_CURRENT, MODE_LOW, currentToNextCount2, nextMaChangePoint2);
+          highestLowestCandle = MathMin(highestLowestCandle1, highestLowestCandle2);
         }
         else if (maCross.orderEnvironment == ENV_BUY)
         {
-          highestLowestPrice1 = iHighest(_Symbol, PERIOD_CURRENT, MODE_HIGH, currentToNextCount1, nextMaChangePoint1); // findHigh(_Symbol, PERIOD_CURRENT, maChangePoint);
-          highestLowestPrice2 = iHighest(_Symbol, PERIOD_CURRENT, MODE_HIGH, currentToNextCount2, nextMaChangePoint2);
-          highestLowestPrice = MathMax(highestLowestPrice1, highestLowestPrice2);
+          highestLowestCandle1 = iHighest(_Symbol, PERIOD_CURRENT, MODE_HIGH, currentToNextCount1, nextMaChangePoint1); // findHigh(_Symbol, PERIOD_CURRENT, maChangePoint);
+          highestLowestCandle2 = iHighest(_Symbol, PERIOD_CURRENT, MODE_HIGH, currentToNextCount2, nextMaChangePoint2);
+          highestLowestCandle = MathMax(highestLowestCandle1, highestLowestCandle2);
         }
-        if (highestLowestPrice != -1)
+        if (highestLowestCandle > 0)
         {
-          drawVLine(highestLowestPrice, IntegerToString(highestLowestPrice), clrBlue);
+          drawVLine(highestLowestCandle, IntegerToString(highestLowestCandle), C'207,0,249');
           // Calculate price difference from entrance point
         }
       }
@@ -365,7 +366,6 @@ bool checkLowerMaBreak(string symbol, ENUM_TIMEFRAMES lower_tf, OrderEnvironment
   return buyMaBreak || sellMaBreak;
 }
 
-
 //+------------------------------------------------------------------+
 //|                                                                  |
 //+------------------------------------------------------------------+
@@ -420,6 +420,30 @@ void drawVLine(int shift, string id = "", double clr = clrAqua)
   // ObjectDelete(id2);
   ObjectCreate(id2, OBJ_VLINE, 0, time, price);
   ObjectSet(id2, OBJPROP_COLOR, clr);
+}
+
+void drawArrowObj(int shift, bool up = true, string id = "", double clr = clrAqua)
+{
+  datetime time = iTime(_Symbol, PERIOD_CURRENT, shift);
+  double price = up ? iLow(_Symbol, PERIOD_CURRENT, shift) : iHigh(_Symbol, PERIOD_CURRENT, shift);
+  const double increment = Point() * 100;
+  price = up ? price - increment : price + increment;
+  int obj = up ? OBJ_ARROW_UP : OBJ_ARROW_DOWN;
+
+  string id2 = "liberty_arrow_" + id;
+
+  // ObjectDelete(id2);
+  ObjectCreate(id2, obj, 0, time, price);
+  ObjectSet(id2, OBJPROP_COLOR, clr);
+  ObjectSetInteger(0, id2, OBJPROP_WIDTH, 5);
+}
+//+------------------------------------------------------------------+
+
+void deleteObjectsAll()
+{
+  ObjectsDeleteAll(0, "liberty_arrow_");
+  ObjectsDeleteAll(0, "liberty_v_");
+  // ObjectsDeleteAll(0, OBJ_ARROW_DOWN);
 }
 //+------------------------------------------------------------------+
 
