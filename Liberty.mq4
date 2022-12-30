@@ -92,9 +92,33 @@ void OnTick()
       for (int i = 0; i < listSize; i++)
       {
         int maChangePoint = maDirChangeList[i];
-        datetime time = iTime(_Symbol, PERIOD_CURRENT, maChangePoint);
-        double price = iOpen(_Symbol, PERIOD_CURRENT, maChangePoint);
-        drawVLine(time, price, IntegerToString(maChangePoint));
+        drawVLine(maChangePoint, IntegerToString(maChangePoint));
+
+        // 2 vahed check mishavad ta balatarin ya payintarin noghteye ehtemalie akhir peyda shavad
+        int highestLowestPrice = -1;
+        int highestLowestPrice1 = -1;
+        int highestLowestPrice2 = -1;
+        int nextMaChangePoint1 = i < listSize - 1 ? maDirChangeList[i + 1] : 0;
+        int currentToNextCount1 = MathAbs(maChangePoint - nextMaChangePoint1);
+        int nextMaChangePoint2 = i < listSize - 2 ? maDirChangeList[i + 2] : 0;
+        int currentToNextCount2 = MathAbs(maChangePoint - nextMaChangePoint2);
+        if (maCross.orderEnvironment == ENV_SELL)
+        {
+          highestLowestPrice1 = iLowest(_Symbol, PERIOD_CURRENT, MODE_LOW, currentToNextCount1, nextMaChangePoint1); // findLow(_Symbol, PERIOD_CURRENT, maChangePoint);
+          highestLowestPrice2 = iLowest(_Symbol, PERIOD_CURRENT, MODE_LOW, currentToNextCount2, nextMaChangePoint2);
+          highestLowestPrice = MathMin(highestLowestPrice1, highestLowestPrice2);
+        }
+        else if (maCross.orderEnvironment == ENV_BUY)
+        {
+          highestLowestPrice1 = iHighest(_Symbol, PERIOD_CURRENT, MODE_HIGH, currentToNextCount1, nextMaChangePoint1); // findHigh(_Symbol, PERIOD_CURRENT, maChangePoint);
+          highestLowestPrice2 = iHighest(_Symbol, PERIOD_CURRENT, MODE_HIGH, currentToNextCount2, nextMaChangePoint2);
+          highestLowestPrice = MathMax(highestLowestPrice1, highestLowestPrice2);
+        }
+        if (highestLowestPrice != -1)
+        {
+          drawVLine(highestLowestPrice, IntegerToString(highestLowestPrice), clrBlue);
+          // Calculate price difference from entrance point
+        }
       }
     }
   }
@@ -341,6 +365,7 @@ bool checkLowerMaBreak(string symbol, ENUM_TIMEFRAMES lower_tf, OrderEnvironment
   return buyMaBreak || sellMaBreak;
 }
 
+
 //+------------------------------------------------------------------+
 //|                                                                  |
 //+------------------------------------------------------------------+
@@ -385,13 +410,16 @@ void drawCross(datetime time, double price)
   //  }
 }
 
-void drawVLine(datetime time, double price, string id = "")
+void drawVLine(int shift, string id = "", double clr = clrAqua)
 {
+  datetime time = iTime(_Symbol, PERIOD_CURRENT, shift);
+  double price = iOpen(_Symbol, PERIOD_CURRENT, shift);
+
   string id2 = "liberty_v_" + id;
 
   // ObjectDelete(id2);
   ObjectCreate(id2, OBJ_VLINE, 0, time, price);
-  ObjectSet(id2, OBJPROP_COLOR, clrAqua);
+  ObjectSet(id2, OBJPROP_COLOR, clr);
 }
 //+------------------------------------------------------------------+
 
