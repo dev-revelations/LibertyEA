@@ -36,6 +36,15 @@ struct LowMaChangeResult
   }
 };
 
+struct SignalResult
+{
+  int maChangeShift;  // Noghteye taghir
+  int highestShift;   // Agar sell hast balatarin noghte ghable vorod
+  int lowestShift;    // Agar buy hast payintarin noghte ghable vorod
+  int moveDepthShift; // Cheghadr move zade
+  SignalResult() {}
+};
+
 struct HigherTFCrossCheckResult
 {
   OrderEnvironment orderEnvironment;
@@ -56,7 +65,7 @@ struct HigherTFCrossCheckResult
 int OnInit()
 {
   //---
-
+  EventSetTimer(2);
   //---
   return (INIT_SUCCEEDED);
 }
@@ -81,50 +90,83 @@ void OnTick()
 
     if (firstAreaTouchShift > 0)
     {
-
-      int maDirChangeList[];
-
-      listLowMaDirChanges(maDirChangeList, _Symbol, PERIOD_CURRENT, maCross.orderEnvironment, firstAreaTouchShift);
-      int listSize = ArraySize(maDirChangeList);
-
       deleteObjectsAll();
+
+      SignalResult signals[];
+      listSignals(signals, _Symbol, PERIOD_CURRENT, maCross.orderEnvironment, firstAreaTouchShift);
+      int listSize = ArraySize(signals);
 
       for (int i = 0; i < listSize; i++)
       {
-        int maChangePoint = maDirChangeList[i];
-        // drawVLine(maChangePoint, IntegerToString(maChangePoint));
-        drawArrowObj(maChangePoint, maCross.orderEnvironment == ENV_BUY, IntegerToString(i));
+        SignalResult item = signals[i];
 
-        // 2 vahed check mishavad ta balatarin ya payintarin noghteye ehtemalie akhir peyda shavad
-        int highestLowestCandle = -1;
-        int highestLowestCandle1 = -1;
-        int highestLowestCandle2 = -1;
-        int nextMaChangePoint1 = i < listSize - 1 ? maDirChangeList[i + 1] : 0;
-        int currentToNextCount1 = MathAbs(maChangePoint - nextMaChangePoint1);
-        int nextMaChangePoint2 = i < listSize - 2 ? maDirChangeList[i + 2] : 0;
-        int currentToNextCount2 = MathAbs(maChangePoint - nextMaChangePoint2);
-        if (maCross.orderEnvironment == ENV_SELL)
+        drawVLine(item.moveDepthShift, IntegerToString(item.moveDepthShift), C '207,0,249');
+        if (maCross.orderEnvironment == ENV_SELL && item.highestShift > -1)
         {
-          highestLowestCandle1 = iLowest(_Symbol, PERIOD_CURRENT, MODE_LOW, currentToNextCount1, nextMaChangePoint1); // findLow(_Symbol, PERIOD_CURRENT, maChangePoint);
-          highestLowestCandle2 = iLowest(_Symbol, PERIOD_CURRENT, MODE_LOW, currentToNextCount2, nextMaChangePoint2);
-          highestLowestCandle = MathMin(highestLowestCandle1, highestLowestCandle2);
+          drawArrowObj(item.highestShift, false, IntegerToString(item.highestShift), C '60,167,17');
         }
-        else if (maCross.orderEnvironment == ENV_BUY)
+        else if (maCross.orderEnvironment == ENV_BUY && item.lowestShift > -1)
         {
-          highestLowestCandle1 = iHighest(_Symbol, PERIOD_CURRENT, MODE_HIGH, currentToNextCount1, nextMaChangePoint1); // findHigh(_Symbol, PERIOD_CURRENT, maChangePoint);
-          highestLowestCandle2 = iHighest(_Symbol, PERIOD_CURRENT, MODE_HIGH, currentToNextCount2, nextMaChangePoint2);
-          highestLowestCandle = MathMax(highestLowestCandle1, highestLowestCandle2);
+          drawArrowObj(item.lowestShift, true, IntegerToString(item.lowestShift), C '249,0,0');
         }
-        if (highestLowestCandle > 0)
-        {
-          drawVLine(highestLowestCandle, IntegerToString(highestLowestCandle), C'207,0,249');
-          // Calculate price difference from entrance point
-        }
+
+        drawArrowObj(item.maChangeShift, maCross.orderEnvironment == ENV_BUY, IntegerToString(item.maChangeShift));
+
+        // drawVLine(item.lowestShift, IntegerToString(item.lowestShift), C'207,249,0');
       }
+
+      return;
+
+      // int maDirChangeList[];
+
+      // listLowMaDirChanges(maDirChangeList, _Symbol, PERIOD_CURRENT, maCross.orderEnvironment, firstAreaTouchShift);
+      // int listSize = ArraySize(maDirChangeList);
+
+      // deleteObjectsAll();
+
+      // SignalResult signals[];
+      // listSignals(signals, _Symbol, PERIOD_CURRENT, maCross.orderEnvironment, firstAreaTouchShift);
+
+      // for (int i = 0; i < listSize; i++)
+      // {
+      //   int maChangePoint = maDirChangeList[i];
+      //   // drawVLine(maChangePoint, IntegerToString(maChangePoint));
+      //   drawArrowObj(maChangePoint, maCross.orderEnvironment == ENV_BUY, IntegerToString(i));
+
+      //   // 2 vahed check mishavad ta balatarin ya payintarin noghteye ehtemalie akhir peyda shavad
+      //   int highestLowestCandle = -1;
+      //   int highestLowestCandle1 = -1;
+      //   int highestLowestCandle2 = -1;
+      //   int nextMaChangePoint1 = i < listSize - 1 ? maDirChangeList[i + 1] : 0;
+      //   int currentToNextCount1 = MathAbs(maChangePoint - nextMaChangePoint1);
+      //   int nextMaChangePoint2 = i < listSize - 2 ? maDirChangeList[i + 2] : 0;
+      //   int currentToNextCount2 = MathAbs(maChangePoint - nextMaChangePoint2);
+      //   if (maCross.orderEnvironment == ENV_SELL)
+      //   {
+      //     highestLowestCandle1 = iLowest(_Symbol, PERIOD_CURRENT, MODE_LOW, currentToNextCount1, nextMaChangePoint1); // findLow(_Symbol, PERIOD_CURRENT, maChangePoint);
+      //     highestLowestCandle2 = iLowest(_Symbol, PERIOD_CURRENT, MODE_LOW, currentToNextCount2, nextMaChangePoint2);
+      //     highestLowestCandle = MathMin(highestLowestCandle1, highestLowestCandle2);
+      //   }
+      //   else if (maCross.orderEnvironment == ENV_BUY)
+      //   {
+      //     highestLowestCandle1 = iHighest(_Symbol, PERIOD_CURRENT, MODE_HIGH, currentToNextCount1, nextMaChangePoint1); // findHigh(_Symbol, PERIOD_CURRENT, maChangePoint);
+      //     highestLowestCandle2 = iHighest(_Symbol, PERIOD_CURRENT, MODE_HIGH, currentToNextCount2, nextMaChangePoint2);
+      //     highestLowestCandle = MathMax(highestLowestCandle1, highestLowestCandle2);
+      //   }
+      //   if (highestLowestCandle > 0)
+      //   {
+      //     drawVLine(highestLowestCandle, IntegerToString(highestLowestCandle), C'207,0,249');
+      //     // Calculate price difference from entrance point
+      //   }
+      // }
     }
   }
 }
 //+------------------------------------------------------------------+
+void OnTimer()
+{
+  OnTick();
+}
 
 HigherTFCrossCheckResult findHigherTimeFrameMACross(string symbol, ENUM_TIMEFRAMES higherTF)
 {
@@ -258,6 +300,7 @@ void listLowMaDirChanges(int &list[], string symbol, ENUM_TIMEFRAMES lowTF, Orde
     }
   }
 }
+
 LowMaChangeResult getLowerMaDirection(string symbol, ENUM_TIMEFRAMES lower_tf, int startFromShift = 1, int scanRange = 200)
 {
   const int VALUE_UP = 1;
@@ -364,6 +407,66 @@ bool checkLowerMaBreak(string symbol, ENUM_TIMEFRAMES lower_tf, OrderEnvironment
   bool sellMaBreak = (orderEnv == ENV_SELL && price < MA_10);
 
   return buyMaBreak || sellMaBreak;
+}
+
+void listSignals(SignalResult &list[], string symbol, ENUM_TIMEFRAMES lowTF, OrderEnvironment orderEnv, int firstAreaTouchShift)
+{
+  int maDirChangeList[];
+  listLowMaDirChanges(maDirChangeList, symbol, lowTF, orderEnv, firstAreaTouchShift);
+  int listSize = ArraySize(maDirChangeList);
+
+  ArrayResize(list, listSize);
+
+  for (int i = 0; i < listSize; i++)
+  {
+    SignalResult item;
+    item.maChangeShift = maDirChangeList[i];
+    item.highestShift = -1;
+    item.lowestShift = -1;
+    item.moveDepthShift = -1;
+
+    // Find Highest/Lowest candle that belongs to the move as part of the signal
+    int currentMaChangePoint = maDirChangeList[i];
+    int prevSignalDepth = i == 0 ? -1 : list[i - 1].moveDepthShift;
+    // Agar omghe move dasht ta omghe move ghabli toptarin ya lowtarin ra peyda mikonim
+    int prevMaChangePoint = i == 0 ? firstAreaTouchShift : (prevSignalDepth > -1 && prevSignalDepth > currentMaChangePoint + 3 ? prevSignalDepth : maDirChangeList[i - 1]);
+    int candleCountBetween = MathAbs(prevMaChangePoint - currentMaChangePoint);
+    if (orderEnv == ENV_SELL)
+    {
+      item.highestShift = iHighest(symbol, lowTF, MODE_HIGH, candleCountBetween + 1, currentMaChangePoint);
+      // drawArrowObj(item.highestShift, false, IntegerToString(item.highestShift), C'60,167,17');
+    }
+    else if (orderEnv == ENV_BUY)
+    {
+      item.lowestShift = iLowest(symbol, lowTF, MODE_LOW, candleCountBetween + 1, currentMaChangePoint);
+      // drawArrowObj(item.lowestShift, true, IntegerToString(item.lowestShift), C'249,0,0');
+    }
+
+    // Find Move Depth
+
+    // 2 vahed check mishavad ta balatarin ya payintarin noghteye ehtemalie akhir peyda shavad
+    int maChangePoint = maDirChangeList[i];
+    int depthCandle1 = -1;
+    int depthCandle2 = -1;
+    int nextMaChangePoint1 = i < listSize - 1 ? maDirChangeList[i + 1] : 0;
+    int currentToNextCount1 = MathAbs(maChangePoint - nextMaChangePoint1);
+    int nextMaChangePoint2 = i < listSize - 2 ? maDirChangeList[i + 2] : 0;
+    int currentToNextCount2 = MathAbs(maChangePoint - nextMaChangePoint2);
+    if (orderEnv == ENV_SELL)
+    {
+      depthCandle1 = iLowest(symbol, lowTF, MODE_LOW, currentToNextCount1, nextMaChangePoint1);
+      depthCandle2 = iLowest(symbol, lowTF, MODE_LOW, currentToNextCount2, nextMaChangePoint2);
+      item.moveDepthShift = MathMin(depthCandle1, depthCandle2);
+    }
+    else if (orderEnv == ENV_BUY)
+    {
+      depthCandle1 = iHighest(symbol, lowTF, MODE_HIGH, currentToNextCount1, nextMaChangePoint1);
+      depthCandle2 = iHighest(symbol, lowTF, MODE_HIGH, currentToNextCount2, nextMaChangePoint2);
+      item.moveDepthShift = MathMax(depthCandle1, depthCandle2);
+    }
+
+    list[i] = item;
+  }
 }
 
 //+------------------------------------------------------------------+
