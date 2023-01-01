@@ -124,7 +124,7 @@ void OnTick()
         double orderColor = clrAqua;
         double depthOfMoveColor = C'207,0,249';
 
-        const int active = 3;
+        const int active = 10;
 
         if (i == active)
         {
@@ -475,19 +475,38 @@ void listSignals(SignalResult &list[], string symbol, ENUM_TIMEFRAMES lowTF, Ord
     item.moveDepthShift = -1;
 
     // Find Highest/Lowest candle that belongs to the move as part of the signal
+    // 2 vahed check mikonim
+
     int currentMaChangePoint = maDirChangeList[i];
-    int prevSignalDepth = i == 0 ? -1 : list[i - 1].moveDepthShift;
+    int prevSignalDepth = i <= 0 ? -1 : list[i - 1].moveDepthShift;
     // Agar omghe move dasht ta omghe move ghabli toptarin ya lowtarin ra peyda mikonim
-    int prevMaChangePoint = i == 0 ? firstAreaTouchShift : (prevSignalDepth > -1 && prevSignalDepth > currentMaChangePoint + 3 ? prevSignalDepth : maDirChangeList[i - 1]);
-    int candleCountBetween = MathAbs(prevMaChangePoint - currentMaChangePoint);
+    int prevMaChangePoint1 = i <= 0 ? firstAreaTouchShift : (prevSignalDepth > -1 && prevSignalDepth > currentMaChangePoint + 3 ? prevSignalDepth : maDirChangeList[i - 1]);
+    int candleCountBetween1 = MathAbs((prevMaChangePoint1 + 1) - currentMaChangePoint);
+
+    prevSignalDepth = i <= 2 ? -1 : list[i - 2].moveDepthShift;
+    int prevMaChangePoint2 = i <= 2 ? firstAreaTouchShift : (maDirChangeList[i - 2]);
+    int candleCountBetween2 = MathAbs((prevMaChangePoint2 + 1) - currentMaChangePoint);
+
     if (orderEnv == ENV_SELL)
     {
-      item.highestShift = iHighest(symbol, lowTF, MODE_HIGH, candleCountBetween + 1, currentMaChangePoint);
+      int highestShift1 = iHighest(symbol, lowTF, MODE_HIGH, candleCountBetween1 + 1, currentMaChangePoint);
+      double price1 = iHigh(symbol, lowTF, highestShift1);
+
+      int highestShift2 = iHighest(symbol, lowTF, MODE_HIGH, candleCountBetween2 + 1, currentMaChangePoint);
+      double price2 = iHigh(symbol, lowTF, highestShift2);
+
+      item.highestShift = price2 > price1 ? highestShift2 : highestShift1;
       // drawArrowObj(item.highestShift, false, IntegerToString(item.highestShift), C'60,167,17');
     }
     else if (orderEnv == ENV_BUY)
     {
-      item.lowestShift = iLowest(symbol, lowTF, MODE_LOW, candleCountBetween + 1, currentMaChangePoint);
+      int lowestShift1 = iLowest(symbol, lowTF, MODE_LOW, candleCountBetween1 + 1, currentMaChangePoint);
+      double price1 = iLow(symbol, lowTF, lowestShift1);
+
+      int lowestShift2 = iLowest(symbol, lowTF, MODE_LOW, candleCountBetween2 + 1, currentMaChangePoint);
+      double price2 = iLow(symbol, lowTF, lowestShift2);
+
+      item.lowestShift = price2 < price1 ? lowestShift2 : lowestShift1;
       // drawArrowObj(item.lowestShift, true, IntegerToString(item.lowestShift), C'249,0,0');
     }
 
