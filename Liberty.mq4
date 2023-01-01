@@ -107,63 +107,14 @@ void OnTick()
 
     if (firstAreaTouchShift > 0)
     {
-      deleteObjectsAll();
-
       SignalResult signals[];
       listSignals(signals, _Symbol, PERIOD_CURRENT, maCross.orderEnvironment, firstAreaTouchShift);
-      int listSize = ArraySize(signals);
 
-      for (int i = 0; i < listSize; i++)
-      {
-        SignalResult item = signals[i];
+      // TODO: Validate Signal
 
-        OrderInfoResult orderCalculated;
+      // TODO: open signal
 
-        double hsColor = C'60,167,17';
-        double lsColor = C'249,0,0';
-        double orderColor = clrAqua;
-        double depthOfMoveColor = C'207,0,249';
-
-        const int active = 10;
-
-        if (i == active)
-        {
-          lsColor = C'255,230,6';
-          orderColor = clrGreen;
-          depthOfMoveColor = C'249,0,0';
-          drawVLine(item.maChangeShift, IntegerToString(item.maChangeShift) + "test", orderColor);
-        }
-
-        drawVLine(item.moveDepthShift, IntegerToString(item.moveDepthShift), depthOfMoveColor);
-
-        if (maCross.orderEnvironment == ENV_SELL && item.highestShift > -1)
-        {
-          drawArrowObj(item.highestShift, false, IntegerToString(item.highestShift), hsColor);
-
-          double virtualPrice = iLow(_Symbol, PERIOD_CURRENT, item.maChangeShift);
-          orderCalculated = calculeOrderPlace(_Symbol, PERIOD_CURRENT, maCross.orderEnvironment, item.maChangeShift, item.highestShift, virtualPrice);
-        }
-        else if (maCross.orderEnvironment == ENV_BUY && item.lowestShift > -1)
-        {
-          drawArrowObj(item.lowestShift, true, IntegerToString(item.lowestShift), lsColor);
-
-          double virtualPrice = iHigh(_Symbol, PERIOD_CURRENT, item.maChangeShift);
-          orderCalculated = calculeOrderPlace(_Symbol, PERIOD_CURRENT, maCross.orderEnvironment, item.maChangeShift, item.lowestShift, virtualPrice);
-        }
-
-        drawArrowObj(item.maChangeShift, maCross.orderEnvironment == ENV_BUY, IntegerToString(item.maChangeShift), orderColor);
-
-        // drawVLine(item.lowestShift, IntegerToString(item.lowestShift), C'207,249,0');
-
-        if (i == active)
-        {
-          string id = IntegerToString(i);
-          drawHLine(orderCalculated.orderPrice, "_order_" + id, orderCalculated.pending ? C'245,46,219' : C'0,191,73');
-          drawHLine(orderCalculated.slPrice, "_sl_" + id, clrOrange);
-          drawHLine(orderCalculated.tpPrice, "_tp_" + id, C'207,249,0');
-        }
-      }
-
+      simulate(_Symbol, PERIOD_CURRENT, maCross, firstAreaTouchShift, signals);
     }
   }
 }
@@ -649,5 +600,61 @@ void breakPoint()
     keybd_event(19, 0, 0, 0);
     Sleep(100);
     keybd_event(19, 0, 2, 0);
+  }
+}
+
+void simulate(string symbol, ENUM_TIMEFRAMES tf, HigherTFCrossCheckResult &maCross, int firstAreaTouchShift, SignalResult &signals[])
+{
+  deleteObjectsAll();
+  int listSize = ArraySize(signals);
+  for (int i = 0; i < listSize; i++)
+  {
+    SignalResult item = signals[i];
+
+    OrderInfoResult orderCalculated;
+
+    double hsColor = C '60,167,17';
+    double lsColor = C '249,0,0';
+    double orderColor = clrAqua;
+    double depthOfMoveColor = C '207,0,249';
+
+    const int active = 10;
+
+    if (i == active)
+    {
+      lsColor = C '255,230,6';
+      orderColor = clrGreen;
+      depthOfMoveColor = C '249,0,0';
+      drawVLine(item.maChangeShift, IntegerToString(item.maChangeShift) + "test", orderColor);
+    }
+
+    drawVLine(item.moveDepthShift, IntegerToString(item.moveDepthShift), depthOfMoveColor);
+
+    if (maCross.orderEnvironment == ENV_SELL && item.highestShift > -1)
+    {
+      drawArrowObj(item.highestShift, false, IntegerToString(item.highestShift), hsColor);
+
+      double virtualPrice = iLow(_Symbol, PERIOD_CURRENT, item.maChangeShift);
+      orderCalculated = calculeOrderPlace(_Symbol, PERIOD_CURRENT, maCross.orderEnvironment, item.maChangeShift, item.highestShift, virtualPrice);
+    }
+    else if (maCross.orderEnvironment == ENV_BUY && item.lowestShift > -1)
+    {
+      drawArrowObj(item.lowestShift, true, IntegerToString(item.lowestShift), lsColor);
+
+      double virtualPrice = iHigh(_Symbol, PERIOD_CURRENT, item.maChangeShift);
+      orderCalculated = calculeOrderPlace(_Symbol, PERIOD_CURRENT, maCross.orderEnvironment, item.maChangeShift, item.lowestShift, virtualPrice);
+    }
+
+    drawArrowObj(item.maChangeShift, maCross.orderEnvironment == ENV_BUY, IntegerToString(item.maChangeShift), orderColor);
+
+    // drawVLine(item.lowestShift, IntegerToString(item.lowestShift), C'207,249,0');
+
+    if (i == active)
+    {
+      string id = IntegerToString(i);
+      drawHLine(orderCalculated.orderPrice, "_order_" + id, orderCalculated.pending ? C '245,46,219' : C '0,191,73');
+      drawHLine(orderCalculated.slPrice, "_sl_" + id, clrOrange);
+      drawHLine(orderCalculated.tpPrice, "_tp_" + id, C '207,249,0');
+    }
   }
 }
