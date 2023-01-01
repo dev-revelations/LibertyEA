@@ -11,6 +11,9 @@
 #include <WinUser32.mqh>
 
 extern ENUM_TIMEFRAMES higher_timeframe = PERIOD_H4;
+extern double TakeProfitRatio = 3;
+extern double AverageCandleSizeRatio = 2.5;
+extern int AverageCandleSizePeriod = 40;
 
 enum OrderEnvironment
 {
@@ -59,6 +62,20 @@ struct HigherTFCrossCheckResult
   }
 };
 
+struct OrderInfoResult
+{
+  double slPrice;
+  double tpPrice;
+  double orderPrice;
+  bool pending;
+  OrderInfoResult()
+  {
+    slPrice = -1;
+    tpPrice = -1;
+    orderPrice = -1;
+    pending = false;
+  }
+};
 //+------------------------------------------------------------------+
 //| Expert initialization function                                   |
 //+------------------------------------------------------------------+
@@ -100,19 +117,36 @@ void OnTick()
       {
         SignalResult item = signals[i];
 
-        drawVLine(item.moveDepthShift, IntegerToString(item.moveDepthShift), C '207,0,249');
+        OrderInfoResult orderCalculated;
+
+        drawVLine(item.moveDepthShift, IntegerToString(item.moveDepthShift), C'207,0,249');
+
         if (maCross.orderEnvironment == ENV_SELL && item.highestShift > -1)
         {
-          drawArrowObj(item.highestShift, false, IntegerToString(item.highestShift), C '60,167,17');
+          drawArrowObj(item.highestShift, false, IntegerToString(item.highestShift), C'60,167,17');
+
+          double virtualPrice = iLow(_Symbol, PERIOD_CURRENT, item.maChangeShift);
+          orderCalculated = calculeOrderPlace(_Symbol, PERIOD_CURRENT, maCross.orderEnvironment, item.maChangeShift, item.highestShift, virtualPrice);
         }
         else if (maCross.orderEnvironment == ENV_BUY && item.lowestShift > -1)
         {
-          drawArrowObj(item.lowestShift, true, IntegerToString(item.lowestShift), C '249,0,0');
+          drawArrowObj(item.lowestShift, true, IntegerToString(item.lowestShift), C'249,0,0');
+
+          double virtualPrice = iHigh(_Symbol, PERIOD_CURRENT, item.maChangeShift);
+          orderCalculated = calculeOrderPlace(_Symbol, PERIOD_CURRENT, maCross.orderEnvironment, item.maChangeShift, item.lowestShift, virtualPrice);
         }
 
         drawArrowObj(item.maChangeShift, maCross.orderEnvironment == ENV_BUY, IntegerToString(item.maChangeShift));
 
         // drawVLine(item.lowestShift, IntegerToString(item.lowestShift), C'207,249,0');
+
+        if (i == 4)
+        {
+          string id = IntegerToString(i);
+          drawHLine(orderCalculated.orderPrice, "_order_" + id, orderCalculated.pending ? C'245,46,219' : C'0,191,73');
+          drawHLine(orderCalculated.slPrice, "_sl_" + id, clrOrange);
+          drawHLine(orderCalculated.tpPrice, "_tp_" + id, C'207,249,0');
+        }
       }
 
       return;
@@ -469,6 +503,57 @@ void listSignals(SignalResult &list[], string symbol, ENUM_TIMEFRAMES lowTF, Ord
   }
 }
 
+OrderInfoResult calculeOrderPlace(string symbol, ENUM_TIMEFRAMES tf, OrderEnvironment orderEnv, int signalShift, int highestLowestShift, double price)
+{
+  OrderInfoResult orderInfo;
+
+  double highestLowestPrice = (orderEnv == ENV_SELL)
+                                  ? iHigh(symbol, tf, highestLowestShift)
+                                  : iLow(symbol, tf, highestLowestShift);
+
+  double averageCandle = averageCandleSize(symbol, tf, signalShift, AverageCandleSizePeriod);
+  double scaledCandleSize = averageCandle * AverageCandleSizeRatio;
+
+  orderInfo.slPrice = highestLowestPrice;
+
+  if (orderEnv == ENV_SELL)
+  {
+    double signalLow = iLow(symbol, tf, signalShift);
+    double signalToScaledCandleSize = signalLow - scaledCandleSize;
+    orderInfo.pending = (price < signalToScaledCandleSize);
+
+    orderInfo.orderPrice = orderInfo.pending ? signalLow : price;
+    double priceSlDistance = MathAbs(orderInfo.orderPrice - highestLowestPrice);
+    orderInfo.tpPrice = orderInfo.orderPrice - (priceSlDistance * TakeProfitRatio);
+  }
+  else if (orderEnv == ENV_BUY)
+  {
+    double signalHigh = iHigh(symbol, tf, signalShift);
+    double signalToScaledCandleSize = signalHigh + scaledCandleSize;
+    orderInfo.pending = (price > signalToScaledCandleSize);
+
+    orderInfo.orderPrice = orderInfo.pending ? signalHigh : price;
+    double priceSlDistance = MathAbs(orderInfo.orderPrice - highestLowestPrice);
+    orderInfo.tpPrice = orderInfo.orderPrice + (priceSlDistance * TakeProfitRatio);
+  }
+
+  return orderInfo;
+}
+
+double averageCandleSize(string symbol, ENUM_TIMEFRAMES tf, int startShift, int period)
+{
+  double sum = 0;
+  period = startShift == 0 ? period : period + 1;
+  for (int i = startShift; i < period; i++)
+  {
+    double close = iHigh(symbol, tf, i);
+    double open = iLow(symbol, tf, i);
+
+    sum += MathAbs(open - close);
+  }
+
+  return (double)(sum / period) /* * (MathPow(10, _Digits-1))*/;
+}
 //+------------------------------------------------------------------+
 //|                                                                  |
 //+------------------------------------------------------------------+
@@ -525,6 +610,17 @@ void drawVLine(int shift, string id = "", double clr = clrAqua)
   ObjectSet(id2, OBJPROP_COLOR, clr);
 }
 
+void drawHLine(double price, string id = "", double clr = clrAqua)
+{
+  datetime time = iTime(_Symbol, PERIOD_CURRENT, 0);
+
+  string id2 = "liberty_h_" + id;
+
+  // ObjectDelete(id2);
+  ObjectCreate(id2, OBJ_HLINE, 0, time, price);
+  ObjectSet(id2, OBJPROP_COLOR, clr);
+}
+
 void drawArrowObj(int shift, bool up = true, string id = "", double clr = clrAqua)
 {
   datetime time = iTime(_Symbol, PERIOD_CURRENT, shift);
@@ -546,6 +642,7 @@ void deleteObjectsAll()
 {
   ObjectsDeleteAll(0, "liberty_arrow_");
   ObjectsDeleteAll(0, "liberty_v_");
+  ObjectsDeleteAll(0, "liberty_h_");
   // ObjectsDeleteAll(0, OBJ_ARROW_DOWN);
 }
 //+------------------------------------------------------------------+
