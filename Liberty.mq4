@@ -119,28 +119,43 @@ void OnTick()
 
         OrderInfoResult orderCalculated;
 
-        drawVLine(item.moveDepthShift, IntegerToString(item.moveDepthShift), C'207,0,249');
+        double hsColor = C'60,167,17';
+        double lsColor = C'249,0,0';
+        double orderColor = clrAqua;
+        double depthOfMoveColor = C'207,0,249';
+
+        const int active = 3;
+
+        if (i == active)
+        {
+          lsColor = C'255,230,6';
+          orderColor = clrGreen;
+          depthOfMoveColor = C'249,0,0';
+          drawVLine(item.maChangeShift, IntegerToString(item.maChangeShift) + "test", orderColor);
+        }
+
+        drawVLine(item.moveDepthShift, IntegerToString(item.moveDepthShift), depthOfMoveColor);
 
         if (maCross.orderEnvironment == ENV_SELL && item.highestShift > -1)
         {
-          drawArrowObj(item.highestShift, false, IntegerToString(item.highestShift), C'60,167,17');
+          drawArrowObj(item.highestShift, false, IntegerToString(item.highestShift), hsColor);
 
           double virtualPrice = iLow(_Symbol, PERIOD_CURRENT, item.maChangeShift);
           orderCalculated = calculeOrderPlace(_Symbol, PERIOD_CURRENT, maCross.orderEnvironment, item.maChangeShift, item.highestShift, virtualPrice);
         }
         else if (maCross.orderEnvironment == ENV_BUY && item.lowestShift > -1)
         {
-          drawArrowObj(item.lowestShift, true, IntegerToString(item.lowestShift), C'249,0,0');
+          drawArrowObj(item.lowestShift, true, IntegerToString(item.lowestShift), lsColor);
 
           double virtualPrice = iHigh(_Symbol, PERIOD_CURRENT, item.maChangeShift);
           orderCalculated = calculeOrderPlace(_Symbol, PERIOD_CURRENT, maCross.orderEnvironment, item.maChangeShift, item.lowestShift, virtualPrice);
         }
 
-        drawArrowObj(item.maChangeShift, maCross.orderEnvironment == ENV_BUY, IntegerToString(item.maChangeShift));
+        drawArrowObj(item.maChangeShift, maCross.orderEnvironment == ENV_BUY, IntegerToString(item.maChangeShift), orderColor);
 
         // drawVLine(item.lowestShift, IntegerToString(item.lowestShift), C'207,249,0');
 
-        if (i == 4)
+        if (i == active)
         {
           string id = IntegerToString(i);
           drawHLine(orderCalculated.orderPrice, "_order_" + id, orderCalculated.pending ? C'245,46,219' : C'0,191,73');
@@ -489,14 +504,18 @@ void listSignals(SignalResult &list[], string symbol, ENUM_TIMEFRAMES lowTF, Ord
     if (orderEnv == ENV_SELL)
     {
       depthCandle1 = iLowest(symbol, lowTF, MODE_LOW, currentToNextCount1, nextMaChangePoint1);
+      double price1 = iLow(symbol, lowTF, depthCandle1);
       depthCandle2 = iLowest(symbol, lowTF, MODE_LOW, currentToNextCount2, nextMaChangePoint2);
-      item.moveDepthShift = MathMin(depthCandle1, depthCandle2);
+      double price2 = iLow(symbol, lowTF, depthCandle2);
+      item.moveDepthShift = price2 < price1 ? depthCandle2 : depthCandle1;
     }
     else if (orderEnv == ENV_BUY)
     {
       depthCandle1 = iHighest(symbol, lowTF, MODE_HIGH, currentToNextCount1, nextMaChangePoint1);
+      double price1 = iHigh(symbol, lowTF, depthCandle1);
       depthCandle2 = iHighest(symbol, lowTF, MODE_HIGH, currentToNextCount2, nextMaChangePoint2);
-      item.moveDepthShift = MathMax(depthCandle1, depthCandle2);
+      double price2 = iHigh(symbol, lowTF, depthCandle2);
+      item.moveDepthShift = price2 > price1 ? depthCandle2 : depthCandle1;
     }
 
     list[i] = item;
