@@ -14,6 +14,7 @@ extern ENUM_TIMEFRAMES higher_timeframe = PERIOD_H4;
 extern double TakeProfitRatio = 3;
 extern double AverageCandleSizeRatio = 2.5;
 extern int AverageCandleSizePeriod = 40;
+extern int ActiveSignalForTest = 0;
 
 enum OrderEnvironment
 {
@@ -68,12 +69,14 @@ struct OrderInfoResult
   double tpPrice;
   double orderPrice;
   bool pending;
+  bool valid;
   OrderInfoResult()
   {
     slPrice = -1;
     tpPrice = -1;
     orderPrice = -1;
     pending = false;
+    valid = false;
   }
 };
 //+------------------------------------------------------------------+
@@ -485,6 +488,75 @@ OrderInfoResult calculeOrderPlace(string symbol, ENUM_TIMEFRAMES tf, OrderEnviro
   return orderInfo;
 }
 
+OrderInfoResult signalToOrderInfo(string symbol, ENUM_TIMEFRAMES tf, OrderEnvironment orderEnv, SignalResult &signal)
+{
+  OrderInfoResult orderCalculated;
+  if (orderEnv == ENV_SELL && signal.highestShift > -1)
+  {
+    double virtualPrice = iLow(symbol, tf, signal.maChangeShift);
+    orderCalculated = calculeOrderPlace(symbol, tf, orderEnv, signal.maChangeShift, signal.highestShift, virtualPrice);
+  }
+  else if (orderEnv == ENV_BUY && signal.lowestShift > -1)
+  {
+    double virtualPrice = iHigh(symbol, tf, signal.maChangeShift);
+    orderCalculated = calculeOrderPlace(symbol, tf, orderEnv, signal.maChangeShift, signal.lowestShift, virtualPrice);
+  }
+  return orderCalculated;
+}
+
+OrderInfoResult validateOrderDistance(string symbol, ENUM_TIMEFRAMES tf, OrderEnvironment orderEnv, SignalResult &signals[], int signalIndexToValidate)
+{
+
+  OrderInfoResult indexOrderInfo = signalToOrderInfo(symbol, tf, orderEnv, signals[signalIndexToValidate]);
+
+  if (signalIndexToValidate > 0)
+  {
+    // Find highest/lowest entry price in the past
+    OrderInfoResult mostValidEntry = signalToOrderInfo(symbol, tf, orderEnv, signals[0]);
+    int place = 0;
+    for (int i = 0; i < signalIndexToValidate; i++)
+    {
+      SignalResult item = signals[i];
+      OrderInfoResult signalOrderInfo = signalToOrderInfo(symbol, tf, orderEnv, item);
+
+      if (orderEnv == ENV_SELL && signalOrderInfo.orderPrice > mostValidEntry.orderPrice)
+      {
+        mostValidEntry = signalOrderInfo;
+        place = i;
+      }
+      else if (orderEnv == ENV_BUY && signalOrderInfo.orderPrice < mostValidEntry.orderPrice)
+      {
+        mostValidEntry = signalOrderInfo;
+        place = i;
+      }
+    }
+
+    if (mostValidEntry.orderPrice > -1)
+    {
+      bool isValidPriceDistance = (orderEnv == ENV_SELL && indexOrderInfo.orderPrice > mostValidEntry.tpPrice) || (orderEnv == ENV_BUY && indexOrderInfo.orderPrice < mostValidEntry.tpPrice);
+      // If it is in a valid distance to first entry we will consider that entry as a pending order and replace with current one
+      if (isValidPriceDistance)
+      {
+        indexOrderInfo = mostValidEntry;
+        indexOrderInfo.pending = true;
+        indexOrderInfo.valid = true;
+      }
+    }
+    else
+    {
+      // If nothing found the order itself is valid whatever calculated
+      indexOrderInfo.valid = true;
+    }
+  }
+  else
+  {
+    // if index = 0, the first signal is always valid
+    indexOrderInfo.valid = true;
+  }
+
+  return indexOrderInfo;
+}
+
 double averageCandleSize(string symbol, ENUM_TIMEFRAMES tf, int startShift, int period)
 {
   double sum = 0;
@@ -581,6 +653,23 @@ void drawArrowObj(int shift, bool up = true, string id = "", double clr = clrAqu
   ObjectSet(id2, OBJPROP_COLOR, clr);
   ObjectSetInteger(0, id2, OBJPROP_WIDTH, 5);
 }
+
+void drawValidationObj(int shift, bool up = true, bool valid = true, string id = "", double clr = C'9,255,9')
+{
+  datetime time = iTime(_Symbol, PERIOD_CURRENT, shift);
+  double price = up ? iLow(_Symbol, PERIOD_CURRENT, shift) : iHigh(_Symbol, PERIOD_CURRENT, shift);
+  const double increment = Point() * 200;
+  price = up ? price - increment : price + increment;
+  int obj = valid ? OBJ_ARROW_CHECK : OBJ_ARROW_STOP;
+
+  string id2 = "liberty_validation_" + id;
+
+  // ObjectDelete(id2);
+  ObjectCreate(id2, obj, 0, time, price);
+  ObjectSet(id2, OBJPROP_COLOR, clr);
+  ObjectSetInteger(0, id2, OBJPROP_WIDTH, 5);
+}
+
 //+------------------------------------------------------------------+
 
 void deleteObjectsAll()
@@ -588,6 +677,7 @@ void deleteObjectsAll()
   ObjectsDeleteAll(0, "liberty_arrow_");
   ObjectsDeleteAll(0, "liberty_v_");
   ObjectsDeleteAll(0, "liberty_h_");
+  ObjectsDeleteAll(0, "liberty_validation_");
   // ObjectsDeleteAll(0, OBJ_ARROW_DOWN);
 }
 //+------------------------------------------------------------------+
@@ -613,33 +703,33 @@ void simulate(string symbol, ENUM_TIMEFRAMES tf, HigherTFCrossCheckResult &maCro
 
     OrderInfoResult orderCalculated;
 
-    double hsColor = C '60,167,17';
-    double lsColor = C '249,0,0';
+    double hsColor = C'60,167,17';
+    double lsColor = C'249,0,0';
     double orderColor = clrAqua;
-    double depthOfMoveColor = C '207,0,249';
+    double depthOfMoveColor = C'207,0,249';
 
-    const int active = 10;
+    const int active = ActiveSignalForTest;
 
     if (i == active)
     {
-      lsColor = C '255,230,6';
+      lsColor = C'255,230,6';
       orderColor = clrGreen;
-      depthOfMoveColor = C '249,0,0';
+      depthOfMoveColor = C'249,0,0';
       drawVLine(item.maChangeShift, IntegerToString(item.maChangeShift) + "test", orderColor);
     }
 
-    drawVLine(item.moveDepthShift, IntegerToString(item.moveDepthShift), depthOfMoveColor);
+    // drawVLine(item.moveDepthShift, IntegerToString(item.moveDepthShift), depthOfMoveColor);
 
     if (maCross.orderEnvironment == ENV_SELL && item.highestShift > -1)
     {
-      drawArrowObj(item.highestShift, false, IntegerToString(item.highestShift), hsColor);
+      // drawArrowObj(item.highestShift, false, IntegerToString(item.highestShift), hsColor);
 
       double virtualPrice = iLow(_Symbol, PERIOD_CURRENT, item.maChangeShift);
       orderCalculated = calculeOrderPlace(_Symbol, PERIOD_CURRENT, maCross.orderEnvironment, item.maChangeShift, item.highestShift, virtualPrice);
     }
     else if (maCross.orderEnvironment == ENV_BUY && item.lowestShift > -1)
     {
-      drawArrowObj(item.lowestShift, true, IntegerToString(item.lowestShift), lsColor);
+      // drawArrowObj(item.lowestShift, true, IntegerToString(item.lowestShift), lsColor);
 
       double virtualPrice = iHigh(_Symbol, PERIOD_CURRENT, item.maChangeShift);
       orderCalculated = calculeOrderPlace(_Symbol, PERIOD_CURRENT, maCross.orderEnvironment, item.maChangeShift, item.lowestShift, virtualPrice);
@@ -649,12 +739,16 @@ void simulate(string symbol, ENUM_TIMEFRAMES tf, HigherTFCrossCheckResult &maCro
 
     // drawVLine(item.lowestShift, IntegerToString(item.lowestShift), C'207,249,0');
 
+    orderCalculated = validateOrderDistance(_Symbol, PERIOD_CURRENT, maCross.orderEnvironment, signals, i);
+
+    drawValidationObj(item.maChangeShift, maCross.orderEnvironment == ENV_BUY, orderCalculated.valid, IntegerToString(item.maChangeShift), orderCalculated.valid ? C'9,255,9' : C'249,92,92');
+
     if (i == active)
     {
       string id = IntegerToString(i);
-      drawHLine(orderCalculated.orderPrice, "_order_" + id, orderCalculated.pending ? C '245,46,219' : C '0,191,73');
-      drawHLine(orderCalculated.slPrice, "_sl_" + id, clrOrange);
-      drawHLine(orderCalculated.tpPrice, "_tp_" + id, C '207,249,0');
+      drawHLine(orderCalculated.orderPrice, "_order_" + id, orderCalculated.pending ? C'245,46,219' : C'0,191,73');
+      drawHLine(orderCalculated.slPrice, "_sl_" + id, C'255,5,134');
+      drawHLine(orderCalculated.tpPrice, "_tp_" + id, C'0,119,255');
     }
   }
 }
