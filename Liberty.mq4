@@ -164,50 +164,6 @@ void OnTick()
         }
       }
 
-      return;
-
-      // int maDirChangeList[];
-
-      // listLowMaDirChanges(maDirChangeList, _Symbol, PERIOD_CURRENT, maCross.orderEnvironment, firstAreaTouchShift);
-      // int listSize = ArraySize(maDirChangeList);
-
-      // deleteObjectsAll();
-
-      // SignalResult signals[];
-      // listSignals(signals, _Symbol, PERIOD_CURRENT, maCross.orderEnvironment, firstAreaTouchShift);
-
-      // for (int i = 0; i < listSize; i++)
-      // {
-      //   int maChangePoint = maDirChangeList[i];
-      //   // drawVLine(maChangePoint, IntegerToString(maChangePoint));
-      //   drawArrowObj(maChangePoint, maCross.orderEnvironment == ENV_BUY, IntegerToString(i));
-
-      //   // 2 vahed check mishavad ta balatarin ya payintarin noghteye ehtemalie akhir peyda shavad
-      //   int highestLowestCandle = -1;
-      //   int highestLowestCandle1 = -1;
-      //   int highestLowestCandle2 = -1;
-      //   int nextMaChangePoint1 = i < listSize - 1 ? maDirChangeList[i + 1] : 0;
-      //   int currentToNextCount1 = MathAbs(maChangePoint - nextMaChangePoint1);
-      //   int nextMaChangePoint2 = i < listSize - 2 ? maDirChangeList[i + 2] : 0;
-      //   int currentToNextCount2 = MathAbs(maChangePoint - nextMaChangePoint2);
-      //   if (maCross.orderEnvironment == ENV_SELL)
-      //   {
-      //     highestLowestCandle1 = iLowest(_Symbol, PERIOD_CURRENT, MODE_LOW, currentToNextCount1, nextMaChangePoint1); // findLow(_Symbol, PERIOD_CURRENT, maChangePoint);
-      //     highestLowestCandle2 = iLowest(_Symbol, PERIOD_CURRENT, MODE_LOW, currentToNextCount2, nextMaChangePoint2);
-      //     highestLowestCandle = MathMin(highestLowestCandle1, highestLowestCandle2);
-      //   }
-      //   else if (maCross.orderEnvironment == ENV_BUY)
-      //   {
-      //     highestLowestCandle1 = iHighest(_Symbol, PERIOD_CURRENT, MODE_HIGH, currentToNextCount1, nextMaChangePoint1); // findHigh(_Symbol, PERIOD_CURRENT, maChangePoint);
-      //     highestLowestCandle2 = iHighest(_Symbol, PERIOD_CURRENT, MODE_HIGH, currentToNextCount2, nextMaChangePoint2);
-      //     highestLowestCandle = MathMax(highestLowestCandle1, highestLowestCandle2);
-      //   }
-      //   if (highestLowestCandle > 0)
-      //   {
-      //     drawVLine(highestLowestCandle, IntegerToString(highestLowestCandle), C'207,0,249');
-      //     // Calculate price difference from entrance point
-      //   }
-      // }
     }
   }
 }
