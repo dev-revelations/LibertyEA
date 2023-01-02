@@ -12,7 +12,7 @@
 
 extern ENUM_TIMEFRAMES higher_timeframe = PERIOD_H4;
 extern double TakeProfitRatio = 3;
-extern double AverageCandleSizeRatio = 2.5;
+extern double AverageCandleSizeRatio = 2.25;
 extern int AverageCandleSizePeriod = 40;
 extern int ActiveSignalForTest = 0;
 
@@ -95,6 +95,7 @@ int OnInit()
 void OnDeinit(const int reason)
 {
   //---
+  EventKillTimer();
 }
 //+------------------------------------------------------------------+
 //| Expert tick function                                             |
@@ -461,27 +462,26 @@ OrderInfoResult calculeOrderPlace(string symbol, ENUM_TIMEFRAMES tf, OrderEnviro
 
   double averageCandle = averageCandleSize(symbol, tf, signalShift, AverageCandleSizePeriod);
   double scaledCandleSize = averageCandle * AverageCandleSizeRatio;
+  // Print("scaledCandleSize = ", scaledCandleSize * (MathPow(10, _Digits - 1)), "  averageCandle = ", averageCandle * (MathPow(10, _Digits - 1)));
 
   orderInfo.slPrice = highestLowestPrice;
 
   if (orderEnv == ENV_SELL)
   {
-    double signalLow = iLow(symbol, tf, signalShift);
-    double signalToScaledCandleSize = signalLow - scaledCandleSize;
-    orderInfo.pending = (price < signalToScaledCandleSize);
+    double stopLossToScaledCandleSize = orderInfo.slPrice - scaledCandleSize;
+    orderInfo.pending = (price < stopLossToScaledCandleSize);
 
-    orderInfo.orderPrice = orderInfo.pending ? signalLow : price;
-    double priceSlDistance = MathAbs(orderInfo.orderPrice - highestLowestPrice);
+    orderInfo.orderPrice = orderInfo.pending ? stopLossToScaledCandleSize : price;
+    double priceSlDistance = MathAbs(orderInfo.orderPrice - orderInfo.slPrice);
     orderInfo.tpPrice = orderInfo.orderPrice - (priceSlDistance * TakeProfitRatio);
   }
   else if (orderEnv == ENV_BUY)
   {
-    double signalHigh = iHigh(symbol, tf, signalShift);
-    double signalToScaledCandleSize = signalHigh + scaledCandleSize;
-    orderInfo.pending = (price > signalToScaledCandleSize);
+    double stopLossToScaledCandleSize = orderInfo.slPrice + scaledCandleSize;
+    orderInfo.pending = (price > stopLossToScaledCandleSize);
 
-    orderInfo.orderPrice = orderInfo.pending ? signalHigh : price;
-    double priceSlDistance = MathAbs(orderInfo.orderPrice - highestLowestPrice);
+    orderInfo.orderPrice = orderInfo.pending ? stopLossToScaledCandleSize : price;
+    double priceSlDistance = MathAbs(orderInfo.orderPrice - orderInfo.slPrice);
     orderInfo.tpPrice = orderInfo.orderPrice + (priceSlDistance * TakeProfitRatio);
   }
 
@@ -561,7 +561,8 @@ double averageCandleSize(string symbol, ENUM_TIMEFRAMES tf, int startShift, int 
 {
   double sum = 0;
   period = startShift == 0 ? period : period + 1;
-  for (int i = startShift; i < period; i++)
+  int limit = startShift + period;
+  for (int i = startShift; i < limit; i++)
   {
     double close = iHigh(symbol, tf, i);
     double open = iLow(symbol, tf, i);
@@ -747,7 +748,7 @@ void simulate(string symbol, ENUM_TIMEFRAMES tf, HigherTFCrossCheckResult &maCro
     {
       string id = IntegerToString(i);
       drawHLine(orderCalculated.orderPrice, "_order_" + id, orderCalculated.pending ? C'245,46,219' : C'0,191,73');
-      drawHLine(orderCalculated.slPrice, "_sl_" + id, C'255,5,134');
+      drawHLine(orderCalculated.slPrice, "_sl_" + id, C'255,5,5');
       drawHLine(orderCalculated.tpPrice, "_tp_" + id, C'0,119,255');
     }
   }
