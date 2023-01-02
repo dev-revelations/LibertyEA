@@ -389,37 +389,15 @@ void listSignals(SignalResult &list[], string symbol, ENUM_TIMEFRAMES lowTF, Ord
     // Find Highest/Lowest candle that belongs to the move as part of the signal
     // 2 vahed check mikonim
 
-    int currentMaChangePoint = maDirChangeList[i];
-    int prevSignalDepth = i <= 0 ? -1 : list[i - 1].moveDepthShift;
-    // Agar omghe move dasht ta omghe move ghabli toptarin ya lowtarin ra peyda mikonim
-    int prevMaChangePoint1 = i <= 0 ? firstAreaTouchShift : (prevSignalDepth > -1 && prevSignalDepth > currentMaChangePoint + 3 ? prevSignalDepth : maDirChangeList[i - 1]);
-    int candleCountBetween1 = MathAbs((prevMaChangePoint1 + 1) - currentMaChangePoint);
-
-    prevSignalDepth = i <= 2 ? -1 : list[i - 2].moveDepthShift;
-    int prevMaChangePoint2 = i <= 2 ? firstAreaTouchShift : (maDirChangeList[i - 2]);
-    int candleCountBetween2 = MathAbs((prevMaChangePoint2 + 1) - currentMaChangePoint);
+    int candleCountBetween = MathAbs(firstAreaTouchShift - item.maChangeShift) + 1;
 
     if (orderEnv == ENV_SELL)
     {
-      int highestShift1 = iHighest(symbol, lowTF, MODE_HIGH, candleCountBetween1 + 1, currentMaChangePoint);
-      double price1 = iHigh(symbol, lowTF, highestShift1);
-
-      int highestShift2 = iHighest(symbol, lowTF, MODE_HIGH, candleCountBetween2 + 1, currentMaChangePoint);
-      double price2 = iHigh(symbol, lowTF, highestShift2);
-
-      item.highestShift = price2 > price1 ? highestShift2 : highestShift1;
-      // drawArrowObj(item.highestShift, false, IntegerToString(item.highestShift), C'60,167,17');
+      item.highestShift = iHighest(symbol, lowTF, MODE_HIGH, candleCountBetween, item.maChangeShift);
     }
     else if (orderEnv == ENV_BUY)
     {
-      int lowestShift1 = iLowest(symbol, lowTF, MODE_LOW, candleCountBetween1 + 1, currentMaChangePoint);
-      double price1 = iLow(symbol, lowTF, lowestShift1);
-
-      int lowestShift2 = iLowest(symbol, lowTF, MODE_LOW, candleCountBetween2 + 1, currentMaChangePoint);
-      double price2 = iLow(symbol, lowTF, lowestShift2);
-
-      item.lowestShift = price2 < price1 ? lowestShift2 : lowestShift1;
-      // drawArrowObj(item.lowestShift, true, IntegerToString(item.lowestShift), C'249,0,0');
+      item.lowestShift = iLowest(symbol, lowTF, MODE_HIGH, candleCountBetween, item.maChangeShift);
     }
 
     // Find Move Depth
@@ -538,11 +516,17 @@ OrderInfoResult validateOrderDistance(string symbol, ENUM_TIMEFRAMES tf, OrderEn
 
     if (mostValidEntry.orderPrice > -1)
     {
+
       bool isValidPriceDistance = (orderEnv == ENV_SELL && indexOrderInfo.orderPrice > mostValidEntry.tpPrice) || (orderEnv == ENV_BUY && indexOrderInfo.orderPrice < mostValidEntry.tpPrice);
       // If it is in a valid distance to first entry we will consider that entry as a pending order and replace with current one
       if (isValidPriceDistance)
       {
-        indexOrderInfo = mostValidEntry;
+        // If the highest/lowest found previous signal has higher/lower slPrice will replace it with current signal order info
+        bool shohldReplaceOrderInfo = (orderEnv == ENV_SELL && mostValidEntry.slPrice > indexOrderInfo.slPrice) || (orderEnv == ENV_BUY && mostValidEntry.slPrice < indexOrderInfo.slPrice);
+        if (shohldReplaceOrderInfo)
+        {
+          indexOrderInfo = mostValidEntry;
+        }
         indexOrderInfo.pending = true;
         indexOrderInfo.valid = true;
       }
