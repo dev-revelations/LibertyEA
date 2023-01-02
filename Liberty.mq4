@@ -12,7 +12,8 @@
 
 extern ENUM_TIMEFRAMES higher_timeframe = PERIOD_H4;
 extern double TakeProfitRatio = 3;
-extern double StoplossGapInPip = 2;
+// extern double StoplossGapInPip = 2;
+extern double StopLossGapInAverageCandleSize = 0.2;
 extern double AverageCandleSizeRatio = 2.25;
 extern int AverageCandleSizePeriod = 40;
 extern int ActiveSignalForTest = 0;
@@ -447,7 +448,8 @@ OrderInfoResult calculeOrderPlace(string symbol, ENUM_TIMEFRAMES tf, OrderEnviro
   double scaledCandleSize = averageCandle * AverageCandleSizeRatio;
   // Print("scaledCandleSize = ", scaledCandleSize * (MathPow(10, _Digits - 1)), "  averageCandle = ", averageCandle * (MathPow(10, _Digits - 1)));
 
-  double gapSizeInPoint = pipToPoint(symbol, StoplossGapInPip);
+  // double gapSizeInPoint = pipToPoint(symbol, StoplossGapInPip);
+  double gapSizeInPoint = averageCandle * StopLossGapInAverageCandleSize;
 
   orderInfo.originalPrice = price;
 
@@ -524,6 +526,7 @@ OrderInfoResult validateOrderDistance(string symbol, ENUM_TIMEFRAMES tf, OrderEn
 
     if (mostValidEntry.orderPrice > -1)
     {
+      bool isValidPriceDistance = (orderEnv == ENV_SELL && indexOrderInfo.originalPrice > mostValidEntry.tpPrice) || (orderEnv == ENV_BUY && indexOrderInfo.originalPrice < mostValidEntry.tpPrice);
 
       // if (signalIndexToValidate == ActiveSignalForTest)
       // {
@@ -534,8 +537,8 @@ OrderInfoResult validateOrderDistance(string symbol, ENUM_TIMEFRAMES tf, OrderEn
       //   drawHLine(mostValidEntry.orderPrice, "orderPrice" + IntegerToString(sg.maChangeShift), C'226,195,43');
       //   Print("Order Price = ", indexOrderInfo.orderPrice, " mostTP = ", mostValidEntry.tpPrice, " isValidPriceDistance = ", isValidPriceDistance);
       // }
+
       
-      bool isValidPriceDistance = (orderEnv == ENV_SELL && indexOrderInfo.originalPrice > mostValidEntry.tpPrice) || (orderEnv == ENV_BUY && indexOrderInfo.originalPrice < mostValidEntry.tpPrice);
       // If it is in a valid distance to first entry we will consider that entry as a pending order and replace with current one
       if (isValidPriceDistance)
       {
