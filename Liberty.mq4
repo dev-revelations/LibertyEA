@@ -12,6 +12,7 @@
 
 extern ENUM_TIMEFRAMES higher_timeframe = PERIOD_H4;
 extern double TakeProfitRatio = 3;
+extern double StoplossGapInPip = 2;
 extern double AverageCandleSizeRatio = 2.25;
 extern int AverageCandleSizePeriod = 40;
 extern int ActiveSignalForTest = 0;
@@ -464,10 +465,12 @@ OrderInfoResult calculeOrderPlace(string symbol, ENUM_TIMEFRAMES tf, OrderEnviro
   double scaledCandleSize = averageCandle * AverageCandleSizeRatio;
   // Print("scaledCandleSize = ", scaledCandleSize * (MathPow(10, _Digits - 1)), "  averageCandle = ", averageCandle * (MathPow(10, _Digits - 1)));
 
-  orderInfo.slPrice = highestLowestPrice;
+  double gapSizeInPoint = pipToPoint(symbol, StoplossGapInPip);
 
   if (orderEnv == ENV_SELL)
   {
+    orderInfo.slPrice = highestLowestPrice + gapSizeInPoint;
+
     double stopLossToScaledCandleSize = orderInfo.slPrice - scaledCandleSize;
     orderInfo.pending = (price < stopLossToScaledCandleSize);
 
@@ -477,6 +480,8 @@ OrderInfoResult calculeOrderPlace(string symbol, ENUM_TIMEFRAMES tf, OrderEnviro
   }
   else if (orderEnv == ENV_BUY)
   {
+    orderInfo.slPrice = highestLowestPrice - gapSizeInPoint;
+
     double stopLossToScaledCandleSize = orderInfo.slPrice + scaledCandleSize;
     orderInfo.pending = (price > stopLossToScaledCandleSize);
 
@@ -594,6 +599,12 @@ int getShift(string symbol, ENUM_TIMEFRAMES timeframe, int shift)
   int actualShift = iBarShift(symbol, timeframe, candleTimeCurrent);
 
   return actualShift;
+}
+
+double pipToPoint(string symbol, double pipValue)
+{
+  double digits = MarketInfo(symbol, MODE_DIGITS);
+  return pipValue * (MathPow(0.1, digits - 1));
 }
 
 //+------------------------------------------------------------------+
