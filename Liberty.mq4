@@ -68,7 +68,9 @@ struct OrderInfoResult
 {
   double slPrice;
   double tpPrice;
-  double orderPrice;
+  double orderPrice;        // Final decision
+  double pendingOrderPrice; // Calculated pending price
+  double originalPrice;     // Original price before any decision
   bool pending;
   bool valid;
   OrderInfoResult()
@@ -76,6 +78,8 @@ struct OrderInfoResult
     slPrice = -1;
     tpPrice = -1;
     orderPrice = -1;
+    pendingOrderPrice = -1;
+    originalPrice = -1;
     pending = false;
     valid = false;
   }
@@ -445,6 +449,8 @@ OrderInfoResult calculeOrderPlace(string symbol, ENUM_TIMEFRAMES tf, OrderEnviro
 
   double gapSizeInPoint = pipToPoint(symbol, StoplossGapInPip);
 
+  orderInfo.originalPrice = price;
+
   if (orderEnv == ENV_SELL)
   {
     orderInfo.slPrice = highestLowestPrice + gapSizeInPoint;
@@ -453,6 +459,7 @@ OrderInfoResult calculeOrderPlace(string symbol, ENUM_TIMEFRAMES tf, OrderEnviro
     orderInfo.pending = (price < stopLossToScaledCandleSize);
 
     orderInfo.orderPrice = orderInfo.pending ? stopLossToScaledCandleSize : price;
+    orderInfo.pendingOrderPrice = stopLossToScaledCandleSize;
     double priceSlDistance = MathAbs(orderInfo.orderPrice - orderInfo.slPrice);
     orderInfo.tpPrice = orderInfo.orderPrice - (priceSlDistance * TakeProfitRatio);
   }
@@ -464,6 +471,7 @@ OrderInfoResult calculeOrderPlace(string symbol, ENUM_TIMEFRAMES tf, OrderEnviro
     orderInfo.pending = (price > stopLossToScaledCandleSize);
 
     orderInfo.orderPrice = orderInfo.pending ? stopLossToScaledCandleSize : price;
+    orderInfo.pendingOrderPrice = stopLossToScaledCandleSize;
     double priceSlDistance = MathAbs(orderInfo.orderPrice - orderInfo.slPrice);
     orderInfo.tpPrice = orderInfo.orderPrice + (priceSlDistance * TakeProfitRatio);
   }
@@ -502,12 +510,12 @@ OrderInfoResult validateOrderDistance(string symbol, ENUM_TIMEFRAMES tf, OrderEn
       SignalResult item = signals[i];
       OrderInfoResult signalOrderInfo = signalToOrderInfo(symbol, tf, orderEnv, item);
 
-      if (orderEnv == ENV_SELL && signalOrderInfo.orderPrice > mostValidEntry.orderPrice)
+      if (orderEnv == ENV_SELL && signalOrderInfo.originalPrice > mostValidEntry.originalPrice)
       {
         mostValidEntry = signalOrderInfo;
         place = i;
       }
-      else if (orderEnv == ENV_BUY && signalOrderInfo.orderPrice < mostValidEntry.orderPrice)
+      else if (orderEnv == ENV_BUY && signalOrderInfo.originalPrice < mostValidEntry.originalPrice)
       {
         mostValidEntry = signalOrderInfo;
         place = i;
@@ -517,7 +525,17 @@ OrderInfoResult validateOrderDistance(string symbol, ENUM_TIMEFRAMES tf, OrderEn
     if (mostValidEntry.orderPrice > -1)
     {
 
-      bool isValidPriceDistance = (orderEnv == ENV_SELL && indexOrderInfo.orderPrice > mostValidEntry.tpPrice) || (orderEnv == ENV_BUY && indexOrderInfo.orderPrice < mostValidEntry.tpPrice);
+      // if (signalIndexToValidate == ActiveSignalForTest)
+      // {
+      //   SignalResult item = signals[place];
+      //   drawVLine(item.maChangeShift, IntegerToString(item.maChangeShift), clrRed);
+
+      //   SignalResult sg = signals[signalIndexToValidate];
+      //   drawHLine(mostValidEntry.orderPrice, "orderPrice" + IntegerToString(sg.maChangeShift), C'226,195,43');
+      //   Print("Order Price = ", indexOrderInfo.orderPrice, " mostTP = ", mostValidEntry.tpPrice, " isValidPriceDistance = ", isValidPriceDistance);
+      // }
+      
+      bool isValidPriceDistance = (orderEnv == ENV_SELL && indexOrderInfo.originalPrice > mostValidEntry.tpPrice) || (orderEnv == ENV_BUY && indexOrderInfo.originalPrice < mostValidEntry.tpPrice);
       // If it is in a valid distance to first entry we will consider that entry as a pending order and replace with current one
       if (isValidPriceDistance)
       {
