@@ -273,7 +273,7 @@ LowMaChangeResult getLowerMaDirection(string symbol, ENUM_TIMEFRAMES lower_tf, i
   const int VALUE_DOWN = 2;
   const int VALUE_NULL = -1;
   const int VALUE_BOTH = 3;
-  const int limit = scanRange + 1;
+  const int limit = scanRange + startFromShift;
   double LineUp[], LineDown[];
   ArrayResize(LineUp, limit);
   ArrayFill(LineUp, 0, limit - 1, -1);
@@ -538,7 +538,7 @@ OrderInfoResult validateOrderDistance(string symbol, ENUM_TIMEFRAMES tf, OrderEn
       //   Print("Order Price = ", indexOrderInfo.orderPrice, " mostTP = ", mostValidEntry.tpPrice, " isValidPriceDistance = ", isValidPriceDistance);
       // }
 
-      
+
       // If it is in a valid distance to first entry we will consider that entry as a pending order and replace with current one
       if (isValidPriceDistance)
       {
