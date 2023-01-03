@@ -11,11 +11,16 @@
 #include <WinUser32.mqh>
 
 extern ENUM_TIMEFRAMES higher_timeframe = PERIOD_H4;
+
+extern string _separator2 = "==================="; // ===== Order Settings =====
 extern double TakeProfitRatio = 3;
 // extern double StoplossGapInPip = 2;
 extern double StopLossGapInAverageCandleSize = 0.2;
 extern double AverageCandleSizeRatio = 2.25;
 extern int AverageCandleSizePeriod = 40;
+extern string _separator3 = "==================="; // ===== Lower TF Settings =====
+extern bool OnlyMaCandleBreaks = false;            // Shohld candle break MA?
+extern string _separator5 = "==================="; // ===== Test & Simulation =====
 extern int ActiveSignalForTest = 0;
 
 enum OrderEnvironment
@@ -355,50 +360,59 @@ LowMaChangeResult getLowerMaDirection(string symbol, ENUM_TIMEFRAMES lower_tf, i
     if (lineToScan == 1 && LineUp[j] != VALUE_NULL && LineDown[j] == VALUE_NULL)
     {
       // result.dir = MA_DOWN;
-      for (int k = j; k >= startFromShift; k--)
+      if (OnlyMaCandleBreaks)
       {
-        double MA_10 = getMA(symbol, lower_tf, 10, k);
-        double open = iOpen(symbol, lower_tf, k);
-        double close = iClose(symbol, lower_tf, k);
-        if (open < MA_10 && close < MA_10 && LineUp[startFromShift] == VALUE_NULL && LineDown[startFromShift] != VALUE_NULL)
+        for (int k = j; k >= startFromShift; k--)
         {
-          result.lastChangeShift = k; // - 2;
+          double MA_10 = getMA(symbol, lower_tf, 10, k);
+          double open = iOpen(symbol, lower_tf, k);
+          double close = iClose(symbol, lower_tf, k);
+          if (open < MA_10 && close < MA_10 && LineUp[startFromShift] == VALUE_NULL && LineDown[startFromShift] != VALUE_NULL)
+          {
+            result.lastChangeShift = k; // - 2;
+            break;
+          }
+        }
+
+        if (result.lastChangeShift > -1)
+        {
           break;
         }
       }
-
-      if (result.lastChangeShift > -1)
+      else
       {
+        result.lastChangeShift = j - 2;
         break;
       }
-
-      // result.lastChangeShift = j - 2;
-      // break;
     }
 
     if (lineToScan == 2 && LineDown[j] != VALUE_NULL && LineUp[j] == VALUE_BOTH)
     {
       // result.dir = MA_UP;
-
-      for (int k = j; k >= startFromShift; k--)
+      if (OnlyMaCandleBreaks)
       {
-        double MA_10 = getMA(symbol, lower_tf, 10, k);
-        double open = iOpen(symbol, lower_tf, k);
-        double close = iClose(symbol, lower_tf, k);
-        if (open > MA_10 && close > MA_10 && LineUp[k] != VALUE_NULL && LineDown[k] == VALUE_NULL)
+        for (int k = j; k >= startFromShift; k--)
         {
-          result.lastChangeShift = k; // - 2;
+          double MA_10 = getMA(symbol, lower_tf, 10, k);
+          double open = iOpen(symbol, lower_tf, k);
+          double close = iClose(symbol, lower_tf, k);
+          if (open > MA_10 && close > MA_10 && LineUp[k] != VALUE_NULL && LineDown[k] == VALUE_NULL)
+          {
+            result.lastChangeShift = k; // - 2;
+            break;
+          }
+        }
+
+        if (result.lastChangeShift > -1)
+        {
           break;
         }
       }
-
-      if (result.lastChangeShift > -1)
+      else
       {
+        result.lastChangeShift = j - 1;
         break;
       }
-
-      // result.lastChangeShift = j - 1;
-      // break;
     }
   }
 
