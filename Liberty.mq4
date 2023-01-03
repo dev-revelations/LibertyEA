@@ -252,7 +252,7 @@ void listLowMaDirChanges(int &list[], string symbol, ENUM_TIMEFRAMES lowTF, Orde
     if (isSignal)
     {
       itemCount++;
-      ArrayResize(list, itemCount);
+      ArrayResize(list, itemCount, 1000);
       list[0] = firstAreaTouchShift;
     }
   }
@@ -273,7 +273,7 @@ void listLowMaDirChanges(int &list[], string symbol, ENUM_TIMEFRAMES lowTF, Orde
         if (maResult.lastChangeShift != lastChangePoint && maResult.lastChangeShift <= firstAreaTouchShift)
         {
           itemCount++;
-          ArrayResize(list, itemCount);
+          ArrayResize(list, itemCount, 1000);
           list[itemCount - 1] = maResult.lastChangeShift;
         }
       }
@@ -289,9 +289,9 @@ LowMaChangeResult getLowerMaDirection(string symbol, ENUM_TIMEFRAMES lower_tf, i
   const int VALUE_BOTH = 3;
   const int limit = scanRange + startFromShift;
   double LineUp[], LineDown[];
-  ArrayResize(LineUp, limit);
+  ArrayResize(LineUp, limit, 1000);
   ArrayFill(LineUp, 0, limit - 1, -1);
-  ArrayResize(LineDown, limit);
+  ArrayResize(LineDown, limit, 1000);
   ArrayFill(LineDown, 0, limit - 1, -1);
 
   int lastLine = 1;
@@ -395,7 +395,7 @@ void listSignals(SignalResult &list[], string symbol, ENUM_TIMEFRAMES lowTF, Ord
   listLowMaDirChanges(maDirChangeList, symbol, lowTF, orderEnv, firstAreaTouchShift);
   int listSize = ArraySize(maDirChangeList);
 
-  ArrayResize(list, listSize);
+  ArrayResize(list, listSize, 1000);
 
   for (int i = 0; i < listSize; i++)
   {
