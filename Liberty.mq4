@@ -243,6 +243,20 @@ void listLowMaDirChanges(int &list[], string symbol, ENUM_TIMEFRAMES lowTF, Orde
   }
 
   int itemCount = 0;
+
+  // We check if the first touch itself has the condition of a signal or not
+  if (firstAreaTouchShift >= 1)
+  {
+    LowMaChangeResult firstTouchMa = getLowerMaDirection(symbol, lowTF, firstAreaTouchShift - 1);
+    bool isSignal = (orderEnv == ENV_SELL && firstTouchMa.dir == MA_DOWN) || (orderEnv == ENV_BUY && firstTouchMa.dir == MA_UP);
+    if (isSignal)
+    {
+      itemCount++;
+      ArrayResize(list, itemCount);
+      list[0] = firstAreaTouchShift;
+    }
+  }
+
   for (int i = firstAreaTouchShift - 1; i > 0; i--)
   {
     LowMaChangeResult maResult = getLowerMaDirection(symbol, lowTF, i, firstAreaTouchShift + 1);
@@ -256,7 +270,7 @@ void listLowMaDirChanges(int &list[], string symbol, ENUM_TIMEFRAMES lowTF, Orde
       {
         // To azvoid adding redundant data
         int lastChangePoint = itemCount > 0 ? list[itemCount - 1] : -1;
-        if (maResult.lastChangeShift != lastChangePoint)
+        if (maResult.lastChangeShift != lastChangePoint && maResult.lastChangeShift <= firstAreaTouchShift)
         {
           itemCount++;
           ArrayResize(list, itemCount);
@@ -537,7 +551,6 @@ OrderInfoResult validateOrderDistance(string symbol, ENUM_TIMEFRAMES tf, OrderEn
       //   drawHLine(mostValidEntry.orderPrice, "orderPrice" + IntegerToString(sg.maChangeShift), C'226,195,43');
       //   Print("Order Price = ", indexOrderInfo.orderPrice, " mostTP = ", mostValidEntry.tpPrice, " isValidPriceDistance = ", isValidPriceDistance);
       // }
-
 
       // If it is in a valid distance to first entry we will consider that entry as a pending order and replace with current one
       if (isValidPriceDistance)
