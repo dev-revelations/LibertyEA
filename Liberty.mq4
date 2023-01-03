@@ -355,15 +355,50 @@ LowMaChangeResult getLowerMaDirection(string symbol, ENUM_TIMEFRAMES lower_tf, i
     if (lineToScan == 1 && LineUp[j] != VALUE_NULL && LineDown[j] == VALUE_NULL)
     {
       // result.dir = MA_DOWN;
-      result.lastChangeShift = j - 2;
-      break;
+      for (int k = j; k >= startFromShift; k--)
+      {
+        double MA_10 = getMA(symbol, lower_tf, 10, k);
+        double open = iOpen(symbol, lower_tf, k);
+        double close = iClose(symbol, lower_tf, k);
+        if (open < MA_10 && close < MA_10 && LineUp[startFromShift] == VALUE_NULL && LineDown[startFromShift] != VALUE_NULL)
+        {
+          result.lastChangeShift = k; // - 2;
+          break;
+        }
+      }
+
+      if (result.lastChangeShift > -1)
+      {
+        break;
+      }
+
+      // result.lastChangeShift = j - 2;
+      // break;
     }
 
     if (lineToScan == 2 && LineDown[j] != VALUE_NULL && LineUp[j] == VALUE_BOTH)
     {
       // result.dir = MA_UP;
-      result.lastChangeShift = j - 1;
-      break;
+
+      for (int k = j; k >= startFromShift; k--)
+      {
+        double MA_10 = getMA(symbol, lower_tf, 10, k);
+        double open = iOpen(symbol, lower_tf, k);
+        double close = iClose(symbol, lower_tf, k);
+        if (open > MA_10 && close > MA_10 && LineUp[k] != VALUE_NULL && LineDown[k] == VALUE_NULL)
+        {
+          result.lastChangeShift = k; // - 2;
+          break;
+        }
+      }
+
+      if (result.lastChangeShift > -1)
+      {
+        break;
+      }
+
+      // result.lastChangeShift = j - 1;
+      // break;
     }
   }
 
