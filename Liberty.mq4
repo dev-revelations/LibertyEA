@@ -13,14 +13,19 @@
 extern ENUM_TIMEFRAMES higher_timeframe = PERIOD_H4;
 
 extern string _separator2 = "==================="; // ===== Order Settings =====
+extern double RiskPercent = 1;
 extern double TakeProfitRatio = 3;
 // extern double StoplossGapInPip = 2;
 extern double StopLossGapInAverageCandleSize = 0.2;
 extern double AverageCandleSizeRatio = 2.25;
 extern int AverageCandleSizePeriod = 40;
+extern int PendingsExpirationMinutes = 120;
+extern int MagicNumber = 1111;
+extern string CommentText = "";
 extern string _separator3 = "==================="; // ===== Lower TF Settings =====
 extern bool OnlyMaCandleBreaks = false;            // Shohld candle break MA?
 extern string _separator5 = "==================="; // ===== Test & Simulation =====
+extern bool EnableSimulation = false;
 extern int ActiveSignalForTest = 0;
 
 enum OrderEnvironment
@@ -115,28 +120,46 @@ void OnTick()
 {
   //---
 
-  HigherTFCrossCheckResult maCross = findHigherTimeFrameMACross(_Symbol, higher_timeframe);
-  if (maCross.found)
-  {
-    int firstAreaTouchShift = findAreaTouch(_Symbol, higher_timeframe, maCross.orderEnvironment, maCross.crossCandleShift, PERIOD_CURRENT);
-
-    if (firstAreaTouchShift > 0)
-    {
-      SignalResult signals[];
-      listSignals(signals, _Symbol, PERIOD_CURRENT, maCross.orderEnvironment, firstAreaTouchShift);
-
-      // TODO: Validate Signal
-
-      // TODO: open signal
-
-      simulate(_Symbol, PERIOD_CURRENT, maCross, firstAreaTouchShift, signals);
-    }
-  }
+  runStrategy1(_Symbol, PERIOD_CURRENT, higher_timeframe);
 }
 //+------------------------------------------------------------------+
 void OnTimer()
 {
   OnTick();
+}
+
+void runStrategy1(string symbol, ENUM_TIMEFRAMES lowTF, ENUM_TIMEFRAMES highTF)
+{
+  HigherTFCrossCheckResult maCross = findHigherTimeFrameMACross(symbol, highTF);
+  if (maCross.found)
+  {
+    int firstAreaTouchShift = findAreaTouch(symbol, highTF, maCross.orderEnvironment, maCross.crossCandleShift, PERIOD_CURRENT);
+
+    if (firstAreaTouchShift > 0)
+    {
+      SignalResult signals[];
+      listSignals(signals, symbol, lowTF, maCross.orderEnvironment, firstAreaTouchShift);
+
+      if (EnableSimulation)
+      {
+        simulate(symbol, lowTF, maCross, firstAreaTouchShift, signals);
+      }
+
+      int signalsCount = ArraySize(signals);
+      int lastSignalIndex = signalsCount - 1;
+      SignalResult lastSignal = signals[lastSignalIndex];
+      // Validate Signal
+      OrderInfoResult orderCalculated = signalToOrderInfo(symbol, lowTF, maCross.orderEnvironment, lastSignal);
+      orderCalculated = validateOrderDistance(symbol, lowTF, maCross.orderEnvironment, signals, lastSignalIndex);
+      if (lastSignal.maChangeShift >= 0 && lastSignal.maChangeShift <= 2 && orderCalculated.valid)
+      {
+        // TODO: open signal
+
+        drawVLine(0, "Order_" + IntegerToString(lastSignal.maChangeShift), clrOrange);
+        breakPoint();
+      }
+    }
+  }
 }
 
 HigherTFCrossCheckResult findHigherTimeFrameMACross(string symbol, ENUM_TIMEFRAMES higherTF)
@@ -168,7 +191,7 @@ HigherTFCrossCheckResult findHigherTimeFrameMACross(string symbol, ENUM_TIMEFRAM
     result.crossOpenPrice = price;
     result.crossTime = currentShiftTime;
     result.crossCandleShift = higherTFBeginningInCurrentPeriod;
-    result.crossCandleShiftTimeframe = Period();
+    result.crossCandleShiftTimeframe = (ENUM_TIMEFRAMES)Period();
 
     if (MA5_prev > MA10_prev && MA5_current < MA10_current)
     {
@@ -674,6 +697,88 @@ double pipToPoint(string symbol, double pipValue)
   return pipValue * (MathPow(0.1, digits - 1));
 }
 
+double GetLotSize(string symbol, double riskPercent, double price, double slPrice)
+{
+
+  int digits = (int)SymbolInfoInteger(symbol, SYMBOL_DIGITS);
+  double symbolPoints = MarketInfo(symbol, MODE_POINT);
+  double pointValue = PointValue(symbol);
+  double slPoints = (MathAbs(price - slPrice) / symbolPoints) * (MathPow(0.1, digits - 1)); // /PointsInPip(symbol)/pointValue);
+  double riskAmount = NormalizeDouble(AccountEquity() * (riskPercent / 100.0), 2);
+  double riskLots = (riskAmount / (pointValue * slPoints));
+
+  double lotemin = MarketInfo(symbol, MODE_MINLOT);
+  double lotemax = MarketInfo(symbol, MODE_MAXLOT);
+
+  if (riskLots > lotemax)
+  {
+    riskLots = lotemax;
+  }
+  if (riskLots < lotemin)
+  {
+    riskLots = lotemin;
+  }
+  return riskLots;
+}
+
+double PointValue(string symbol)
+{
+  double tickSize = SymbolInfoDouble(symbol, SYMBOL_TRADE_TICK_SIZE);
+  double tickValue = SymbolInfoDouble(symbol, SYMBOL_TRADE_TICK_VALUE);
+  double point = SymbolInfoDouble(symbol, SYMBOL_POINT);
+  double ticksPerPoint = tickSize / point;
+  double pointValue = tickValue / ticksPerPoint;
+
+  return pointValue;
+}
+
+int Order(string symbol, OrderEnvironment orderEnv, OrderInfoResult &orderInfo)
+{
+
+  int expiration = 0;
+
+  int OP = 0;
+
+  if (orderEnv == ENV_BUY)
+  {
+    OP = orderInfo.pending ? OP_BUYLIMIT : OP_BUY;
+  }
+  else if (orderEnv == ENV_SELL)
+  {
+    OP = orderInfo.pending ? OP_SELLLIMIT : OP_SELL;
+  }
+  else
+  {
+    return -1;
+  }
+
+  double price = orderInfo.orderPrice;
+
+  double SL = orderInfo.slPrice;
+
+  double TP = orderInfo.tpPrice;
+
+  if (orderInfo.pending)
+  {
+    expiration = ((int)TimeCurrent()) + (60 * PendingsExpirationMinutes);
+  }
+
+  double LotSize = GetLotSize(symbol, RiskPercent, price, SL);
+
+  return OrderSend(
+      symbol,
+      OP,
+      LotSize,
+      price,
+      3,
+      SL,
+      TP,
+      CommentText,
+      MagicNumber,
+      expiration,
+      Green);
+}
+
 //+------------------------------------------------------------------+
 //|                                                                  |
 //+------------------------------------------------------------------+
@@ -733,7 +838,7 @@ void drawArrowObj(int shift, bool up = true, string id = "", double clr = clrAqu
   ObjectSetInteger(0, id2, OBJPROP_WIDTH, 5);
 }
 
-void drawValidationObj(int shift, bool up = true, bool valid = true, string id = "", double clr = C '9,255,9')
+void drawValidationObj(int shift, bool up = true, bool valid = true, string id = "", double clr = C'9,255,9')
 {
   datetime time = iTime(_Symbol, PERIOD_CURRENT, shift);
   double price = up ? iLow(_Symbol, PERIOD_CURRENT, shift) : iHigh(_Symbol, PERIOD_CURRENT, shift);
@@ -782,18 +887,18 @@ void simulate(string symbol, ENUM_TIMEFRAMES tf, HigherTFCrossCheckResult &maCro
 
     OrderInfoResult orderCalculated;
 
-    double hsColor = C '60,167,17';
-    double lsColor = C '249,0,0';
+    double hsColor = C'60,167,17';
+    double lsColor = C'249,0,0';
     double orderColor = clrAqua;
-    double depthOfMoveColor = C '207,0,249';
+    double depthOfMoveColor = C'207,0,249';
 
     const int active = ActiveSignalForTest;
 
     if (i == active)
     {
-      lsColor = C '255,230,6';
+      lsColor = C'255,230,6';
       orderColor = clrGreen;
-      depthOfMoveColor = C '249,0,0';
+      depthOfMoveColor = C'249,0,0';
       drawVLine(item.maChangeShift, IntegerToString(item.maChangeShift) + "test", orderColor);
     }
 
@@ -820,14 +925,14 @@ void simulate(string symbol, ENUM_TIMEFRAMES tf, HigherTFCrossCheckResult &maCro
 
     orderCalculated = validateOrderDistance(_Symbol, PERIOD_CURRENT, maCross.orderEnvironment, signals, i);
 
-    drawValidationObj(item.maChangeShift, maCross.orderEnvironment == ENV_BUY, orderCalculated.valid, IntegerToString(item.maChangeShift), orderCalculated.valid ? C '9,255,9' : C '249,92,92');
+    drawValidationObj(item.maChangeShift, maCross.orderEnvironment == ENV_BUY, orderCalculated.valid, IntegerToString(item.maChangeShift), orderCalculated.valid ? C'9,255,9' : C'249,92,92');
 
     if (i == active)
     {
       string id = IntegerToString(i);
-      drawHLine(orderCalculated.orderPrice, "_order_" + id, orderCalculated.pending ? C '245,46,219' : C '0,191,73');
-      drawHLine(orderCalculated.slPrice, "_sl_" + id, C '255,5,5');
-      drawHLine(orderCalculated.tpPrice, "_tp_" + id, C '0,119,255');
+      drawHLine(orderCalculated.orderPrice, "_order_" + id, orderCalculated.pending ? C'245,46,219' : C'0,191,73');
+      drawHLine(orderCalculated.slPrice, "_sl_" + id, C'255,5,5');
+      drawHLine(orderCalculated.tpPrice, "_tp_" + id, C'0,119,255');
     }
   }
 }
