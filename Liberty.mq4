@@ -11,8 +11,10 @@
 #include <WinUser32.mqh>
 
 extern ENUM_TIMEFRAMES higher_timeframe = PERIOD_H4;
-
-extern string _separator2 = "==================="; // ===== Order Settings =====
+extern bool Enable_MA_Closing = false;                // Enable MA Closing Detection
+extern double MA_Closing_AverageCandleSize_Ratio = 2; // MA closing ratio in Average Candle Size
+extern int MA_Closing_Delay = 2;                      // Number of higher TF candles should wait
+extern string _separator2 = "===================";    // ===== Order Settings =====
 extern double RiskPercent = 1;
 extern double TakeProfitRatio = 3;
 // extern double StoplossGapInPip = 2;
@@ -23,7 +25,7 @@ extern int PendingsExpirationMinutes = 120;
 extern int MagicNumber = 1111;
 extern string CommentText = "";
 extern string _separator3 = "==================="; // ===== Lower TF Settings =====
-extern bool OnlyMaCandleBreaks = false;            // Shohld candle break MA?
+extern bool OnlyMaCandleBreaks = true;             // Shohld candle break MA?
 extern string _separator5 = "==================="; // ===== Test & Simulation =====
 extern bool EnableSimulation = false;
 extern int ActiveSignalForTest = 0;
@@ -69,9 +71,12 @@ struct HigherTFCrossCheckResult
   int crossCandleShift;
   ENUM_TIMEFRAMES crossCandleShiftTimeframe;
   bool found;
+  int crossCandleHigherTfShift;
 
   HigherTFCrossCheckResult()
   {
+    found = false;
+    crossCandleHigherTfShift = -1;
   }
 };
 
@@ -120,7 +125,7 @@ void OnTick()
 {
   //---
 
-  runStrategy1(_Symbol, PERIOD_CURRENT, higher_timeframe);
+  runStrategy1(_Symbol, PERIOD_M5, higher_timeframe);
 }
 //+------------------------------------------------------------------+
 void OnTimer()
@@ -135,7 +140,7 @@ void runStrategy1(string symbol, ENUM_TIMEFRAMES lowTF, ENUM_TIMEFRAMES highTF)
   {
     int firstAreaTouchShift = findAreaTouch(symbol, highTF, maCross.orderEnvironment, maCross.crossCandleShift, PERIOD_CURRENT);
 
-    if (firstAreaTouchShift > 0)
+    if (firstAreaTouchShift > 0 && maCross.orderEnvironment != ENV_NONE)
     {
       SignalResult signals[];
       listSignals(signals, symbol, lowTF, maCross.orderEnvironment, firstAreaTouchShift);
@@ -143,20 +148,25 @@ void runStrategy1(string symbol, ENUM_TIMEFRAMES lowTF, ENUM_TIMEFRAMES highTF)
       if (EnableSimulation)
       {
         simulate(symbol, lowTF, maCross, firstAreaTouchShift, signals);
+        drawVLine(maCross.crossCandleShift, "Order_" + IntegerToString(maCross.crossCandleShift), clrBlanchedAlmond);
       }
 
       int signalsCount = ArraySize(signals);
-      int lastSignalIndex = signalsCount - 1;
-      SignalResult lastSignal = signals[lastSignalIndex];
-      // Validate Signal
-      OrderInfoResult orderCalculated = signalToOrderInfo(symbol, lowTF, maCross.orderEnvironment, lastSignal);
-      orderCalculated = validateOrderDistance(symbol, lowTF, maCross.orderEnvironment, signals, lastSignalIndex);
-      if (lastSignal.maChangeShift >= 0 && lastSignal.maChangeShift <= 2 && orderCalculated.valid)
+      if (signalsCount > 0)
       {
-        // TODO: open signal
+        int lastSignalIndex = signalsCount - 1;
+        SignalResult lastSignal = signals[lastSignalIndex];
+        // Validate Signal
+        OrderInfoResult orderCalculated = signalToOrderInfo(symbol, lowTF, maCross.orderEnvironment, lastSignal);
+        orderCalculated = validateOrderDistance(symbol, lowTF, maCross.orderEnvironment, signals, lastSignalIndex);
+        if (lastSignal.maChangeShift >= 0 && lastSignal.maChangeShift <= 2 && orderCalculated.valid)
+        {
+          // TODO: open signal
+          // calculeOrderPlace()
 
-        drawVLine(0, "Order_" + IntegerToString(lastSignal.maChangeShift), clrOrange);
-        breakPoint();
+          drawVLine(0, "Order_" + IntegerToString(lastSignal.maChangeShift), clrOrange);
+          breakPoint();
+        }
       }
     }
   }
@@ -192,6 +202,7 @@ HigherTFCrossCheckResult findHigherTimeFrameMACross(string symbol, ENUM_TIMEFRAM
     result.crossTime = currentShiftTime;
     result.crossCandleShift = higherTFBeginningInCurrentPeriod;
     result.crossCandleShiftTimeframe = (ENUM_TIMEFRAMES)Period();
+    result.crossCandleHigherTfShift = actualShift;
 
     if (MA5_prev > MA10_prev && MA5_current < MA10_current)
     {
@@ -209,6 +220,47 @@ HigherTFCrossCheckResult findHigherTimeFrameMACross(string symbol, ENUM_TIMEFRAM
       result.orderEnvironment = ENV_BUY;
       result.found = true;
       break;
+    }
+  }
+
+  // last validation
+  if (result.found && Enable_MA_Closing)
+  {
+    double MA5_current = iMA(symbol, higherTF, 5, 0, MODE_SMA, PRICE_CLOSE, 0); // getMA(symbol, higherTF, 5, 0);
+    double MA5_prev = iMA(symbol, higherTF, 5, 0, MODE_SMA, PRICE_CLOSE, 1);    // getMA(symbol, higherTF, 5, 1);
+
+    double MA10_current = iMA(symbol, higherTF, 10, 0, MODE_SMA, PRICE_CLOSE, 0); // getMA(symbol, higherTF, 10, 0);
+    double MA10_prev = iMA(symbol, higherTF, 10, 0, MODE_SMA, PRICE_CLOSE, 1);    // getMA(symbol, higherTF, 10, 1);
+
+    const bool buyValidation = (MA5_current > MA10_current);
+    const bool sellValidation = (MA5_current < MA10_current);
+
+    if (MA5_current > MA10_current)
+    {
+      result.orderEnvironment = ENV_BUY;
+    }
+    else if (MA5_current < MA10_current)
+    {
+      result.orderEnvironment = ENV_SELL;
+    }
+    else
+    {
+      result.orderEnvironment = ENV_NONE;
+    }
+
+    // If more than two higher TF candle passed
+    // We will check how close the MAs are
+    // If closer than defined ratio, then it will change the environment to NONE
+    if (result.crossCandleHigherTfShift > MA_Closing_Delay)
+    {
+      const double averageCandle = averageCandleSize(symbol, PERIOD_M5, 0, AverageCandleSizePeriod);
+      const double distanceRatio = averageCandle * MA_Closing_AverageCandleSize_Ratio;
+      const double MAsDistance = MathAbs(MA10_current - MA5_current);
+
+      if (MAsDistance <= distanceRatio)
+      {
+        result.orderEnvironment = ENV_NONE;
+      }
     }
   }
 
