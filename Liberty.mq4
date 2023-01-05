@@ -15,15 +15,18 @@ extern bool Enable_MA_Closing = false;                // Enable MA Closing Detec
 extern double MA_Closing_AverageCandleSize_Ratio = 2; // MA closing ratio in Average Candle Size
 extern int MA_Closing_Delay = 2;                      // Number of higher TF candles should wait
 extern string _separator2 = "===================";    // ===== Order Settings =====
+extern int MagicNumber = 1111;
 extern double RiskPercent = 1;
 extern double TakeProfitRatio = 3;
 // extern double StoplossGapInPip = 2;
 extern double StopLossGapInAverageCandleSize = 0.2;
 extern double AverageCandleSizeRatio = 2.25;
 extern int AverageCandleSizePeriod = 40;
-extern int PendingsExpirationMinutes = 120;
-extern int MagicNumber = 1111;
+extern int PendingsExpirationMinutes = 1000;
 extern string CommentText = "";
+extern bool EnableBreakEven = true;                // Enable Break Even
+extern double BreakEvenRatio = 2.75;               // Break Even Ratio
+extern double BreakEvenGapPip = 2;                 // Break Even Gap Pip
 extern string _separator3 = "==================="; // ===== Lower TF Settings =====
 extern bool OnlyMaCandleBreaks = true;             // Shohld candle break MA?
 extern string _separator5 = "==================="; // ===== Test & Simulation =====
@@ -877,6 +880,11 @@ bool proccessOrders(string symbol, datetime crossTime)
         return true;
       }
 
+      if (EnableBreakEven)
+      {
+        checkForBreakEven(symbol, pos);
+      }
+
       return false;
     }
     // FileWrite(handle, OrderTicket(), OrderOpenPrice(), OrderOpenTime(), OrderSymbol(), OrderLots());
@@ -905,6 +913,59 @@ bool proccessOrders(string symbol, datetime crossTime)
   }
 
   return true;
+}
+
+void checkForBreakEven(string symbol, int orderIndex)
+{
+  if (OrderSelect(orderIndex, SELECT_BY_POS) == false)
+  {
+    return;
+  }
+
+  int OP = OrderType();
+  double SL = OrderStopLoss();
+  double orderPrice = OrderOpenPrice();
+  double ask = MarketInfo(symbol, MODE_ASK);
+
+  bool applyBreakEven = false;
+
+  if (OP == OP_SELL)
+  {
+    double priceSlDistance = MathAbs(orderPrice - SL);
+    double breakEvenThreshold = orderPrice - (priceSlDistance * BreakEvenRatio);
+
+    applyBreakEven = ask <= breakEvenThreshold && SL > orderPrice;
+  }
+  else if (OP == OP_BUY)
+  {
+    double priceSlDistance = MathAbs(orderPrice - SL);
+    double breakEvenThreshold = orderPrice + (priceSlDistance * BreakEvenRatio);
+
+    applyBreakEven = ask >= breakEvenThreshold && SL < orderPrice;
+  }
+
+  if (applyBreakEven)
+  {
+    const int digits = (int)MarketInfo(symbol, MODE_DIGITS);
+    double newSlPrice = OrderOpenPrice();
+    double pipPoint = pipToPoint(symbol, BreakEvenGapPip);
+    newSlPrice = (OP == OP_SELL ? newSlPrice - pipPoint : newSlPrice + pipPoint);
+
+    newSlPrice = NormalizeDouble(newSlPrice, digits);
+
+    OrderModify(
+        OrderTicket(),     // ticket
+        OrderOpenPrice(),  // price
+        newSlPrice,        // stop loss
+        OrderTakeProfit(), // take profit
+        0,                 // expiration
+        clrAqua            // color
+    );
+
+    Print("======================== Breakeven applied==========");
+
+    // breakPoint();
+  }
 }
 
 //+------------------------------------------------------------------+
