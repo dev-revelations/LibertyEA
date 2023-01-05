@@ -880,6 +880,28 @@ bool proccessOrders(string symbol, datetime crossTime)
     // FileWrite(handle, OrderTicket(), OrderOpenPrice(), OrderOpenTime(), OrderSymbol(), OrderLots());
   }
 
+  int i, hstTotal = OrdersHistoryTotal();
+  for (i = 0; i < hstTotal; i++)
+  {
+    //---- check selection result
+    if (OrderSelect(i, SELECT_BY_POS, MODE_HISTORY) == false)
+    {
+      continue;
+    }
+
+    if (symbol == OrderSymbol())
+    {
+      int orderTime = (int)OrderOpenTime();
+      int cross_Time = (int)crossTime;
+      // Already made profit in the current crossing session
+      bool hadProfit = OrderProfit() >= 0; // OrderClosePrice() >= OrderTakeProfit();
+      if (orderTime > cross_Time && hadProfit)
+      {
+        return false;
+      }
+    }
+  }
+
   return true;
 }
 
