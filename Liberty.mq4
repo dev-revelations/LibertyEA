@@ -162,7 +162,21 @@ void runStrategy1(string symbol, ENUM_TIMEFRAMES lowTF, ENUM_TIMEFRAMES highTF)
         if (lastSignal.maChangeShift >= 0 && lastSignal.maChangeShift <= 2 && orderCalculated.valid)
         {
           // TODO: open signal
-          // calculeOrderPlace()
+          if (!orderCalculated.pending)
+          {
+            if (maCross.orderEnvironment == ENV_SELL)
+            {
+              orderCalculated.orderPrice = MarketInfo(symbol, MODE_BID);
+            }
+            else if (maCross.orderEnvironment == ENV_BUY)
+            {
+              orderCalculated.orderPrice = MarketInfo(symbol, MODE_ASK);
+            }
+          }
+
+          Print("Is Pending = ", orderCalculated.pending);
+
+          Order(symbol, maCross.orderEnvironment, orderCalculated);
 
           drawVLine(0, "Order_" + IntegerToString(lastSignal.maChangeShift), clrOrange);
           breakPoint();
@@ -619,18 +633,18 @@ OrderInfoResult calculeOrderPlace(string symbol, ENUM_TIMEFRAMES tf, OrderEnviro
   return orderInfo;
 }
 
-OrderInfoResult signalToOrderInfo(string symbol, ENUM_TIMEFRAMES tf, OrderEnvironment orderEnv, SignalResult &signal)
+OrderInfoResult signalToOrderInfo(string symbol, ENUM_TIMEFRAMES tf, OrderEnvironment orderEnv, SignalResult &signal, bool useVirtualPrice = true)
 {
   OrderInfoResult orderCalculated;
   if (orderEnv == ENV_SELL && signal.highestShift > -1)
   {
-    double virtualPrice = iLow(symbol, tf, signal.maChangeShift);
-    orderCalculated = calculeOrderPlace(symbol, tf, orderEnv, signal.maChangeShift, signal.highestShift, virtualPrice);
+    double price = useVirtualPrice ? iLow(symbol, tf, signal.maChangeShift) : MarketInfo(symbol, MODE_BID);
+    orderCalculated = calculeOrderPlace(symbol, tf, orderEnv, signal.maChangeShift, signal.highestShift, price);
   }
   else if (orderEnv == ENV_BUY && signal.lowestShift > -1)
   {
-    double virtualPrice = iHigh(symbol, tf, signal.maChangeShift);
-    orderCalculated = calculeOrderPlace(symbol, tf, orderEnv, signal.maChangeShift, signal.lowestShift, virtualPrice);
+    double price = useVirtualPrice ? iHigh(symbol, tf, signal.maChangeShift) : MarketInfo(symbol, MODE_ASK);
+    orderCalculated = calculeOrderPlace(symbol, tf, orderEnv, signal.maChangeShift, signal.lowestShift, price);
   }
   return orderCalculated;
 }
@@ -751,37 +765,23 @@ double pipToPoint(string symbol, double pipValue)
 
 double GetLotSize(string symbol, double riskPercent, double price, double slPrice)
 {
-
   int digits = (int)SymbolInfoInteger(symbol, SYMBOL_DIGITS);
-  double symbolPoints = MarketInfo(symbol, MODE_POINT);
-  double pointValue = PointValue(symbol);
-  double slPoints = (MathAbs(price - slPrice) / symbolPoints) * (MathPow(0.1, digits - 1)); // /PointsInPip(symbol)/pointValue);
-  double riskAmount = NormalizeDouble(AccountEquity() * (riskPercent / 100.0), 2);
-  double riskLots = (riskAmount / (pointValue * slPoints));
+  double symbolPoints = MathPow(0.1, digits - 1);
+  double slPoints = (MathAbs(price - slPrice) / symbolPoints) * (MathPow(0.1, digits - 1));
 
-  double lotemin = MarketInfo(symbol, MODE_MINLOT);
-  double lotemax = MarketInfo(symbol, MODE_MAXLOT);
+  double risk = NormalizeDouble(AccountInfoDouble(ACCOUNT_BALANCE) * (riskPercent / 100), 2);
 
-  if (riskLots > lotemax)
-  {
-    riskLots = lotemax;
-  }
-  if (riskLots < lotemin)
-  {
-    riskLots = lotemin;
-  }
-  return riskLots;
-}
+  double ticksize = SymbolInfoDouble(symbol, SYMBOL_TRADE_TICK_SIZE);
+  double tickvalue = SymbolInfoDouble(symbol, SYMBOL_TRADE_TICK_VALUE);
+  double lotstep = SymbolInfoDouble(symbol, SYMBOL_VOLUME_STEP);
 
-double PointValue(string symbol)
-{
-  double tickSize = SymbolInfoDouble(symbol, SYMBOL_TRADE_TICK_SIZE);
-  double tickValue = SymbolInfoDouble(symbol, SYMBOL_TRADE_TICK_VALUE);
-  double point = SymbolInfoDouble(symbol, SYMBOL_POINT);
-  double ticksPerPoint = tickSize / point;
-  double pointValue = tickValue / ticksPerPoint;
+  double moneyPerLotstep = slPoints / ticksize * tickvalue * lotstep;
+  double lots = MathFloor(risk / moneyPerLotstep) * lotstep;
 
-  return pointValue;
+  lots = MathMin(lots, SymbolInfoDouble(symbol, SYMBOL_VOLUME_MAX));
+  lots = MathMax(lots, SymbolInfoDouble(symbol, SYMBOL_VOLUME_MIN));
+
+  return lots;
 }
 
 int Order(string symbol, OrderEnvironment orderEnv, OrderInfoResult &orderInfo)
@@ -804,11 +804,12 @@ int Order(string symbol, OrderEnvironment orderEnv, OrderInfoResult &orderInfo)
     return -1;
   }
 
-  double price = orderInfo.orderPrice;
+  const int digits = (int)MarketInfo(symbol, MODE_DIGITS);
+  double price = NormalizeDouble(orderInfo.orderPrice, digits);
 
-  double SL = orderInfo.slPrice;
+  double SL = NormalizeDouble(orderInfo.slPrice, digits);
 
-  double TP = orderInfo.tpPrice;
+  double TP = NormalizeDouble(orderInfo.tpPrice, digits);
 
   if (orderInfo.pending)
   {
