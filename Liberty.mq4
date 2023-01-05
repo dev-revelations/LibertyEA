@@ -138,6 +138,14 @@ void runStrategy1(string symbol, ENUM_TIMEFRAMES lowTF, ENUM_TIMEFRAMES highTF)
   HigherTFCrossCheckResult maCross = findHigherTimeFrameMACross(symbol, highTF);
   if (maCross.found)
   {
+
+    const bool canCheckSignals = proccessOrders(symbol, maCross.crossTime);
+
+    if (!canCheckSignals)
+    {
+      return;
+    }
+
     int firstAreaTouchShift = findAreaTouch(symbol, highTF, maCross.orderEnvironment, maCross.crossCandleShift, PERIOD_CURRENT);
 
     if (firstAreaTouchShift > 0 && maCross.orderEnvironment != ENV_NONE)
@@ -161,7 +169,7 @@ void runStrategy1(string symbol, ENUM_TIMEFRAMES lowTF, ENUM_TIMEFRAMES highTF)
         orderCalculated = validateOrderDistance(symbol, lowTF, maCross.orderEnvironment, signals, lastSignalIndex);
         if (lastSignal.maChangeShift >= 0 && lastSignal.maChangeShift <= 2 && orderCalculated.valid)
         {
-          // TODO: open signal
+          // open signal
           if (!orderCalculated.pending)
           {
             if (maCross.orderEnvironment == ENV_SELL)
@@ -784,7 +792,7 @@ double GetLotSize(string symbol, double riskPercent, double price, double slPric
   return lots;
 }
 
-int Order(string symbol, OrderEnvironment orderEnv, OrderInfoResult &orderInfo)
+int Order(string symbol, OrderEnvironment orderEnv, OrderInfoResult &orderInfo, string comment = "")
 {
 
   int expiration = 0;
@@ -826,10 +834,28 @@ int Order(string symbol, OrderEnvironment orderEnv, OrderInfoResult &orderInfo)
       3,
       SL,
       TP,
-      CommentText,
+      comment != "" ? comment : CommentText,
       MagicNumber,
       expiration,
       Green);
+}
+
+bool proccessOrders(string symbol, datetime crossTime)
+{
+  int total = OrdersTotal();
+  for (int pos = 0; pos < total; pos++)
+  {
+    if (OrderSelect(pos, SELECT_BY_POS) == false)
+      continue;
+
+    if (symbol == OrderSymbol())
+    {
+      return false;
+    }
+    // FileWrite(handle, OrderTicket(), OrderOpenPrice(), OrderOpenTime(), OrderSymbol(), OrderLots());
+  }
+
+  return true;
 }
 
 //+------------------------------------------------------------------+
@@ -891,7 +917,7 @@ void drawArrowObj(int shift, bool up = true, string id = "", double clr = clrAqu
   ObjectSetInteger(0, id2, OBJPROP_WIDTH, 5);
 }
 
-void drawValidationObj(int shift, bool up = true, bool valid = true, string id = "", double clr = C'9,255,9')
+void drawValidationObj(int shift, bool up = true, bool valid = true, string id = "", double clr = C '9,255,9')
 {
   datetime time = iTime(_Symbol, PERIOD_CURRENT, shift);
   double price = up ? iLow(_Symbol, PERIOD_CURRENT, shift) : iHigh(_Symbol, PERIOD_CURRENT, shift);
@@ -940,18 +966,18 @@ void simulate(string symbol, ENUM_TIMEFRAMES tf, HigherTFCrossCheckResult &maCro
 
     OrderInfoResult orderCalculated;
 
-    double hsColor = C'60,167,17';
-    double lsColor = C'249,0,0';
+    double hsColor = C '60,167,17';
+    double lsColor = C '249,0,0';
     double orderColor = clrAqua;
-    double depthOfMoveColor = C'207,0,249';
+    double depthOfMoveColor = C '207,0,249';
 
     const int active = ActiveSignalForTest;
 
     if (i == active)
     {
-      lsColor = C'255,230,6';
+      lsColor = C '255,230,6';
       orderColor = clrGreen;
-      depthOfMoveColor = C'249,0,0';
+      depthOfMoveColor = C '249,0,0';
       drawVLine(item.maChangeShift, IntegerToString(item.maChangeShift) + "test", orderColor);
     }
 
@@ -978,14 +1004,14 @@ void simulate(string symbol, ENUM_TIMEFRAMES tf, HigherTFCrossCheckResult &maCro
 
     orderCalculated = validateOrderDistance(_Symbol, PERIOD_CURRENT, maCross.orderEnvironment, signals, i);
 
-    drawValidationObj(item.maChangeShift, maCross.orderEnvironment == ENV_BUY, orderCalculated.valid, IntegerToString(item.maChangeShift), orderCalculated.valid ? C'9,255,9' : C'249,92,92');
+    drawValidationObj(item.maChangeShift, maCross.orderEnvironment == ENV_BUY, orderCalculated.valid, IntegerToString(item.maChangeShift), orderCalculated.valid ? C '9,255,9' : C '249,92,92');
 
     if (i == active)
     {
       string id = IntegerToString(i);
-      drawHLine(orderCalculated.orderPrice, "_order_" + id, orderCalculated.pending ? C'245,46,219' : C'0,191,73');
-      drawHLine(orderCalculated.slPrice, "_sl_" + id, C'255,5,5');
-      drawHLine(orderCalculated.tpPrice, "_tp_" + id, C'0,119,255');
+      drawHLine(orderCalculated.orderPrice, "_order_" + id, orderCalculated.pending ? C '245,46,219' : C '0,191,73');
+      drawHLine(orderCalculated.slPrice, "_sl_" + id, C '255,5,5');
+      drawHLine(orderCalculated.tpPrice, "_tp_" + id, C '0,119,255');
     }
   }
 }
