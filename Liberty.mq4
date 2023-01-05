@@ -174,11 +174,13 @@ void runStrategy1(string symbol, ENUM_TIMEFRAMES lowTF, ENUM_TIMEFRAMES highTF)
           {
             if (maCross.orderEnvironment == ENV_SELL)
             {
-              orderCalculated.orderPrice = MarketInfo(symbol, MODE_BID);
+              orderCalculated = calculeOrderPlace(symbol, lowTF, maCross.orderEnvironment, 0, lastSignal.highestShift, MarketInfo(symbol, MODE_BID), false);
+              // orderCalculated.orderPrice = ;
             }
             else if (maCross.orderEnvironment == ENV_BUY)
             {
-              orderCalculated.orderPrice = MarketInfo(symbol, MODE_ASK);
+              // orderCalculated.orderPrice = MarketInfo(symbol, MODE_ASK);
+              orderCalculated = calculeOrderPlace(symbol, lowTF, maCross.orderEnvironment, 0, lastSignal.lowestShift, MarketInfo(symbol, MODE_ASK), false);
             }
             orderCalculated.pending = false;
           }
@@ -597,7 +599,7 @@ void listSignals(SignalResult &list[], string symbol, ENUM_TIMEFRAMES lowTF, Ord
   }
 }
 
-OrderInfoResult calculeOrderPlace(string symbol, ENUM_TIMEFRAMES tf, OrderEnvironment orderEnv, int signalShift, int highestLowestShift, double price)
+OrderInfoResult calculeOrderPlace(string symbol, ENUM_TIMEFRAMES tf, OrderEnvironment orderEnv, int signalShift, int highestLowestShift, double price, bool withPending = true)
 {
   OrderInfoResult orderInfo;
 
@@ -619,7 +621,7 @@ OrderInfoResult calculeOrderPlace(string symbol, ENUM_TIMEFRAMES tf, OrderEnviro
     orderInfo.slPrice = highestLowestPrice + gapSizeInPoint;
 
     double stopLossToScaledCandleSize = orderInfo.slPrice - scaledCandleSize;
-    orderInfo.pending = (price < stopLossToScaledCandleSize);
+    orderInfo.pending = (price < stopLossToScaledCandleSize) && withPending;
 
     orderInfo.orderPrice = orderInfo.pending ? stopLossToScaledCandleSize : price;
     orderInfo.pendingOrderPrice = stopLossToScaledCandleSize;
@@ -631,7 +633,7 @@ OrderInfoResult calculeOrderPlace(string symbol, ENUM_TIMEFRAMES tf, OrderEnviro
     orderInfo.slPrice = highestLowestPrice - gapSizeInPoint;
 
     double stopLossToScaledCandleSize = orderInfo.slPrice + scaledCandleSize;
-    orderInfo.pending = (price > stopLossToScaledCandleSize);
+    orderInfo.pending = (price > stopLossToScaledCandleSize) && withPending;
 
     orderInfo.orderPrice = orderInfo.pending ? stopLossToScaledCandleSize : price;
     orderInfo.pendingOrderPrice = stopLossToScaledCandleSize;
