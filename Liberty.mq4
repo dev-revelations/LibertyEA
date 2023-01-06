@@ -33,6 +33,34 @@ extern string _separator5 = "==================="; // ===== Test & Simulation ==
 extern bool EnableSimulation = false;
 extern int ActiveSignalForTest = 0;
 
+/////////////////////////////////// Symbol Groups Data Structures///////////////////////////////////////////
+
+struct GroupStruct
+{
+  string symbols[];
+  string active_symbol;
+  GroupStruct()
+  {
+    active_symbol = "";
+  }
+};
+
+string GROUPS_STR[] = {
+    "EURUSD GBPUSD AUDUSD NZDUSD",
+    "USDCHF GBPCHF CADCHF EURCHF NZDCHF AUDCHF",
+    "USDJPY EURJPY GBPJPY NZDJPY AUDJPY CHFJPY CADJPY",
+    "USDCAD EURCAD GBPCAD AUDCAD NZDCAD",
+    "EURNZD GBPNZD AUDNZD",
+    "EURAUD GBPAUD",
+    "EURGBP",
+    "GER30.cash FRA40.cash EU50.cash UK100.cash US30.cash US100.cash US500.cash USOIL.cash"};
+
+const ushort SYMBOL_SEPARATOR = ' ';
+GroupStruct GROUPS[];
+int GROUPS_LENGTH = 0;
+
+//////////////////////////////////////////////////////////////////////////////
+
 enum OrderEnvironment
 {
   ENV_NONE,
@@ -110,6 +138,7 @@ int OnInit()
 {
   //---
   EventSetTimer(2);
+  initializeGroups();
   //---
   return (INIT_SUCCEEDED);
 }
@@ -127,7 +156,6 @@ void OnDeinit(const int reason)
 void OnTick()
 {
   //---
-
   runStrategy1(_Symbol, PERIOD_M5, higher_timeframe);
 }
 //+------------------------------------------------------------------+
@@ -187,8 +215,6 @@ void runStrategy1(string symbol, ENUM_TIMEFRAMES lowTF, ENUM_TIMEFRAMES highTF)
             }
             orderCalculated.pending = false;
           }
-
-          Print("Is Pending = ", orderCalculated.pending);
 
           Order(symbol, maCross.orderEnvironment, orderCalculated);
 
@@ -965,6 +991,19 @@ void checkForBreakEven(string symbol, int orderIndex)
     Print("======================== Breakeven applied==========");
 
     // breakPoint();
+  }
+}
+
+void initializeGroups()
+{
+  GROUPS_LENGTH = ArraySize(GROUPS_STR);
+  ArrayResize(GROUPS, GROUPS_LENGTH);
+  for (int i = 0; i < GROUPS_LENGTH; i++)
+  {
+    string symbolsStr = GROUPS_STR[i];
+    GroupStruct group;
+    StringSplit(symbolsStr, SYMBOL_SEPARATOR, group.symbols);
+    GROUPS[i] = group;
   }
 }
 
