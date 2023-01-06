@@ -916,15 +916,10 @@ bool proccessOrders(string symbol, datetime crossTime)
     // FileWrite(handle, OrderTicket(), OrderOpenPrice(), OrderOpenTime(), OrderSymbol(), OrderLots());
   }
 
-  int i, hstTotal = OrdersHistoryTotal();
-  for (i = 0; i < hstTotal; i++)
-  {
-    //---- check selection result
-    if (OrderSelect(i, SELECT_BY_POS, MODE_HISTORY) == false)
-    {
-      continue;
-    }
+  int lastHistoryOrder = selectLastHistoryOrderFor(symbol);
 
+  if (OrderSelect(lastHistoryOrder, SELECT_BY_POS, MODE_HISTORY) == true)
+  {
     if (symbol == OrderSymbol())
     {
       int orderTime = (int)OrderOpenTime();
@@ -939,6 +934,33 @@ bool proccessOrders(string symbol, datetime crossTime)
   }
 
   return true;
+}
+
+int selectLastHistoryOrderFor(string symbol)
+{
+  int i, hstTotal = OrdersHistoryTotal();
+  int lastIndex = -1;
+  int lastFoundOrderTime = -1;
+  for (i = 0; i < hstTotal; i++)
+  {
+    //---- check selection result
+    if (OrderSelect(i, SELECT_BY_POS, MODE_HISTORY) == false)
+    {
+      continue;
+    }
+
+    if (symbol == OrderSymbol())
+    {
+      int orderTime = (int)OrderOpenTime();
+      if (orderTime > lastFoundOrderTime)
+      {
+        lastIndex = i;
+        lastFoundOrderTime = orderTime;
+      }
+    }
+  }
+
+  return lastIndex;
 }
 
 void checkForBreakEven(string symbol, int orderIndex)
