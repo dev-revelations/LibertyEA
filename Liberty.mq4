@@ -44,6 +44,7 @@ struct GroupStruct
   string symbols[];
   string active_symbol;
   int symbols_count;
+
   GroupStruct()
   {
     active_symbol = "";
@@ -179,30 +180,45 @@ void OnTimer()
 
 void scanSymbolGroups()
 {
-
   for (int groupIdx = 0; groupIdx < GROUPS_LENGTH; groupIdx++)
   {
     GroupStruct group = GROUPS[groupIdx];
 
-    if (group.active_symbol != "")
-    {
-      continue;
-    }
-
     for (int symbolIdx = 0; symbolIdx < group.symbols_count; symbolIdx++)
     {
       string symbol = group.symbols[symbolIdx];
+
+      if (IsTesting() && _Symbol != symbol)
+      {
+        continue;
+      }
+
+      if (group.active_symbol != "" && group.active_symbol != symbol)
+      {
+        continue;
+      }
+
+      RefreshRates();
       int result = runStrategy1(symbol, lower_timeframe, higher_timeframe);
-      if (result > -1)
+
+      if (result > 0)
       {
         group.active_symbol = symbol;
       }
+
+      if (result == 0 && group.active_symbol == symbol)
+      {
+        group.active_symbol = "";
+      }
     }
+
+    GROUPS[groupIdx] = group; // Hatman bayad dobare set shavad ta taghirat emal shavad
   }
 }
 
-int runStrategy1(string symbol, ENUM_TIMEFRAMES lowTF, ENUM_TIMEFRAMES highTF)
+int runStrategy1(string symbol, ENUM_TIMEFRAMES lowTF, ENUM_TIMEFRAMES highTF, bool trade = true)
 {
+  int result = -1;
   HigherTFCrossCheckResult maCross = findHigherTimeFrameMACross(symbol, highTF);
   if (maCross.found)
   {
@@ -212,6 +228,10 @@ int runStrategy1(string symbol, ENUM_TIMEFRAMES lowTF, ENUM_TIMEFRAMES highTF)
     if (!canCheckSignals)
     {
       return -1;
+    }
+    else
+    {
+      result = 0;
     }
 
     int firstAreaTouchShift = findAreaTouch(symbol, highTF, maCross.orderEnvironment, maCross.crossCandleShift, PERIOD_CURRENT);
@@ -253,7 +273,10 @@ int runStrategy1(string symbol, ENUM_TIMEFRAMES lowTF, ENUM_TIMEFRAMES highTF)
             orderCalculated.pending = false;
           }
 
-          Order(symbol, maCross.orderEnvironment, orderCalculated);
+          if (trade)
+          {
+            Order(symbol, maCross.orderEnvironment, orderCalculated);
+          }
 
           drawVLine(0, "Order_" + IntegerToString(lastSignal.maChangeShift), clrOrange);
           // breakPoint();
@@ -264,7 +287,7 @@ int runStrategy1(string symbol, ENUM_TIMEFRAMES lowTF, ENUM_TIMEFRAMES highTF)
     }
   }
 
-  return -1;
+  return result;
 }
 
 HigherTFCrossCheckResult findHigherTimeFrameMACross(string symbol, ENUM_TIMEFRAMES higherTF)
