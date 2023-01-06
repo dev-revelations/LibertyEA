@@ -1027,6 +1027,23 @@ int selectLastHistoryOrderTicketFor(string symbol)
   return lastTicket;
 }
 
+int selectOpenOrderTicketFor(string symbol)
+{
+  int total = OrdersTotal();
+  for (int pos = 0; pos < total; pos++)
+  {
+    if (OrderSelect(pos, SELECT_BY_POS) == false)
+      continue;
+
+    if (symbol == OrderSymbol())
+    {
+      return OrderTicket();
+    }
+  }
+
+  return -1;
+}
+
 void checkForBreakEven(string symbol, int orderIndex)
 {
   if (OrderSelect(orderIndex, SELECT_BY_POS) == false)
@@ -1090,6 +1107,19 @@ void initializeGroups()
     GroupStruct group;
     StringSplit(symbolsStr, SYMBOL_SEPARATOR, group.symbols);
     group.symbols_count = ArraySize(group.symbols);
+
+    // Check mikonim agar zamane baz shodane EA orderhaye bazi dashtim ke marboot be symbol bud
+    // An symbol ra be onvane active symbole marboot be group set mikonim
+    for (int symIndex = 0; symIndex < group.symbols_count; symIndex++)
+    {
+      string sym = group.symbols[symIndex];
+      int ticket = selectOpenOrderTicketFor(sym);
+      if (ticket > -1)
+      {
+        group.active_symbol = sym;
+        break;
+      }
+    }
     GROUPS[i] = group;
   }
 }
