@@ -172,6 +172,12 @@ void OnDeinit(const int reason)
 void OnTick()
 {
   //---
+
+  if (!IsTradeAllowed())
+  {
+    return;
+  }
+
   if (SingleChart)
   {
     runStrategy1(_Symbol, lower_timeframe, higher_timeframe);
