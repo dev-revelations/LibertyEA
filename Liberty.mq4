@@ -10,15 +10,18 @@
 
 #include <WinUser32.mqh>
 
-extern bool SingleChart = true;                       // Single Chart Scan
-extern string _separator1 = "===================";    // ===== Higher Timeframe =====
-extern ENUM_TIMEFRAMES higher_timeframe = PERIOD_H4;  // Higher Timeframe
-extern bool Enable_MA_Closing = false;                // Enable MA Closing Detection
-extern double MA_Closing_AverageCandleSize_Ratio = 2; // MA closing ratio in Average Candle Size
-extern int MA_Closing_Delay = 2;                      // Number of higher TF candles should wait
-extern string _separator1_1 = "===================";  // ===== Lower Timeframe =====
-extern ENUM_TIMEFRAMES lower_timeframe = PERIOD_M5;   // Lower Timeframe (Never select current)
-extern string _separator2 = "===================";    // ===== Order Settings =====
+extern bool SingleChart = true;                                          // Single Chart Scan
+extern bool PrioritizeSameGroup = true;                                  // Prioritize Same Group Symbols
+extern bool EnableEATimer = false;                                       // Enable EA Timer
+extern int EATimerSconds = 2;                                            // EA Timer Interval Seconds
+extern string _separator1 = "=======================================";   // ===== Higher Timeframe =====
+extern ENUM_TIMEFRAMES higher_timeframe = PERIOD_H4;                     // Higher Timeframe
+extern bool Enable_MA_Closing = false;                                   // Enable MA Closing Detection
+extern double MA_Closing_AverageCandleSize_Ratio = 2;                    // MA closing ratio in Average Candle Size
+extern int MA_Closing_Delay = 2;                                         // Number of higher TF candles should wait
+extern string _separator1_1 = "======================================="; // ===== Lower Timeframe =====
+extern ENUM_TIMEFRAMES lower_timeframe = PERIOD_M5;                      // Lower Timeframe (Never select current)
+extern string _separator2 = "=======================================";   // ===== Order Settings =====
 extern int MagicNumber = 1111;
 extern double RiskPercent = 1;
 extern double TakeProfitRatio = 3;
@@ -28,12 +31,12 @@ extern double AverageCandleSizeRatio = 2.25;
 extern int AverageCandleSizePeriod = 40;
 extern int PendingsExpirationMinutes = 1000;
 extern string CommentText = "";
-extern bool EnableBreakEven = true;                // Enable Break Even
-extern double BreakEvenRatio = 2.75;               // Break Even Ratio
-extern double BreakEvenGapPip = 2;                 // Break Even Gap Pip
-extern string _separator3 = "==================="; // ===== Lower TF Settings =====
-extern bool OnlyMaCandleBreaks = true;             // Shohld candle break MA?
-extern string _separator5 = "==================="; // ===== Test & Simulation =====
+extern bool EnableBreakEven = true;                                    // Enable Break Even
+extern double BreakEvenRatio = 2.75;                                   // Break Even Ratio
+extern double BreakEvenGapPip = 2;                                     // Break Even Gap Pip
+extern string _separator3 = "======================================="; // ===== Lower TF Settings =====
+extern bool OnlyMaCandleBreaks = true;                                 // Shohld candle break MA?
+extern string _separator5 = "======================================="; // ===== Test & Simulation =====
 extern bool EnableSimulation = false;
 extern int ActiveSignalForTest = 0;
 
@@ -144,7 +147,10 @@ struct OrderInfoResult
 int OnInit()
 {
   //---
-  EventSetTimer(2);
+  if (EnableEATimer)
+  {
+    EventSetTimer(EATimerSconds);
+  }
   initializeGroups();
   //---
   return (INIT_SUCCEEDED);
@@ -155,7 +161,10 @@ int OnInit()
 void OnDeinit(const int reason)
 {
   //---
-  EventKillTimer();
+  if (EnableEATimer)
+  {
+    EventKillTimer();
+  }
 }
 //+------------------------------------------------------------------+
 //| Expert tick function                                             |
@@ -175,7 +184,10 @@ void OnTick()
 //+------------------------------------------------------------------+
 void OnTimer()
 {
-  OnTick();
+  if (EnableEATimer)
+  {
+    OnTick();
+  }
 }
 
 void scanSymbolGroups()
@@ -183,6 +195,18 @@ void scanSymbolGroups()
   for (int groupIdx = 0; groupIdx < GROUPS_LENGTH; groupIdx++)
   {
     GroupStruct group = GROUPS[groupIdx];
+
+    bool isActiveSymPending = true;
+    int activeTicket = -1;
+    if (PrioritizeSameGroup && group.active_symbol != "")
+    {
+      activeTicket = selectOpenOrderTicketFor(group.active_symbol);
+      if (activeTicket > -1)
+      {
+        int OP = OrderType();
+        isActiveSymPending = isOpPending(OP);
+      }
+    }
 
     for (int symbolIdx = 0; symbolIdx < group.symbols_count; symbolIdx++)
     {
@@ -193,13 +217,13 @@ void scanSymbolGroups()
         continue;
       }
 
-      if (group.active_symbol != "" && group.active_symbol != symbol)
+      if (group.active_symbol != "" && group.active_symbol != symbol && !PrioritizeSameGroup)
       {
         continue;
       }
 
       RefreshRates();
-      int result = runStrategy1(symbol, lower_timeframe, higher_timeframe);
+      int result = runStrategy1(symbol, lower_timeframe, higher_timeframe, group.active_symbol == "");
 
       if (result > 0)
       {
@@ -209,6 +233,17 @@ void scanSymbolGroups()
       if (result == 0 && group.active_symbol == symbol)
       {
         group.active_symbol = "";
+      }
+
+      bool canReplaceExistingPendingInCurrentGroup = PrioritizeSameGroup && group.active_symbol != symbol && group.active_symbol != "" && isActiveSymPending && result == 1;
+      if (canReplaceExistingPendingInCurrentGroup)
+      {
+        result = runStrategy1(symbol, lower_timeframe, higher_timeframe);
+        if (result == 1)
+        {
+          group.active_symbol = symbol;
+          OrderDelete(activeTicket, clrAzure);
+        }
       }
     }
 
@@ -1122,6 +1157,11 @@ void initializeGroups()
     }
     GROUPS[i] = group;
   }
+}
+
+bool isOpPending(int op)
+{
+  return op == OP_SELLLIMIT || op == OP_BUYLIMIT || op == OP_SELLSTOP || op == OP_BUYSTOP;
 }
 
 //+------------------------------------------------------------------+
