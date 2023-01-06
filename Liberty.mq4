@@ -944,7 +944,7 @@ bool proccessOrders(string symbol, datetime crossTime)
     if (OrderSelect(pos, SELECT_BY_POS) == false)
       continue;
 
-    if (symbol == OrderSymbol())
+    if (symbol == OrderSymbol() && OrderMagicNumber() == MagicNumber)
     {
       int orderTime = (int)OrderOpenTime();
       int cross_Time = (int)crossTime;
@@ -984,7 +984,7 @@ bool proccessOrders(string symbol, datetime crossTime)
 
   if (lastHistoryOrderTicket > -1 && OrderSelect(lastHistoryOrderTicket, SELECT_BY_TICKET, MODE_HISTORY) == true)
   {
-    if (symbol == OrderSymbol())
+    if (symbol == OrderSymbol() && OrderMagicNumber() == MagicNumber)
     {
       int orderTime = (int)OrderOpenTime();
       int cross_Time = (int)crossTime;
@@ -1013,7 +1013,7 @@ int selectLastHistoryOrderTicketFor(string symbol)
       continue;
     }
 
-    if (symbol == OrderSymbol())
+    if (symbol == OrderSymbol() && OrderMagicNumber() == MagicNumber)
     {
       int orderTime = (int)OrderOpenTime();
       if (orderTime > lastFoundOrderTime)
@@ -1035,7 +1035,7 @@ int selectOpenOrderTicketFor(string symbol)
     if (OrderSelect(pos, SELECT_BY_POS) == false)
       continue;
 
-    if (symbol == OrderSymbol())
+    if (symbol == OrderSymbol() && OrderMagicNumber() == MagicNumber)
     {
       return OrderTicket();
     }
