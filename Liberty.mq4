@@ -10,10 +10,14 @@
 
 #include <WinUser32.mqh>
 
-extern ENUM_TIMEFRAMES higher_timeframe = PERIOD_H4;
+extern bool SingleChart = true;                       // Single Chart Scan
+extern string _separator1 = "===================";    // ===== Higher Timeframe =====
+extern ENUM_TIMEFRAMES higher_timeframe = PERIOD_H4;  // Higher Timeframe
 extern bool Enable_MA_Closing = false;                // Enable MA Closing Detection
 extern double MA_Closing_AverageCandleSize_Ratio = 2; // MA closing ratio in Average Candle Size
 extern int MA_Closing_Delay = 2;                      // Number of higher TF candles should wait
+extern string _separator1_1 = "===================";  // ===== Lower Timeframe =====
+extern ENUM_TIMEFRAMES lower_timeframe = PERIOD_M5;   // Lower Timeframe (Never select current)
 extern string _separator2 = "===================";    // ===== Order Settings =====
 extern int MagicNumber = 1111;
 extern double RiskPercent = 1;
@@ -39,9 +43,11 @@ struct GroupStruct
 {
   string symbols[];
   string active_symbol;
+  int symbols_count;
   GroupStruct()
   {
     active_symbol = "";
+    symbols_count = 0;
   }
 };
 
@@ -156,7 +162,14 @@ void OnDeinit(const int reason)
 void OnTick()
 {
   //---
-  runStrategy1(_Symbol, PERIOD_M5, higher_timeframe);
+  if (SingleChart)
+  {
+    runStrategy1(_Symbol, lower_timeframe, higher_timeframe);
+  }
+  else
+  {
+    scanSymbolGroups();
+  }
 }
 //+------------------------------------------------------------------+
 void OnTimer()
@@ -164,7 +177,31 @@ void OnTimer()
   OnTick();
 }
 
-void runStrategy1(string symbol, ENUM_TIMEFRAMES lowTF, ENUM_TIMEFRAMES highTF)
+void scanSymbolGroups()
+{
+
+  for (int groupIdx = 0; groupIdx < GROUPS_LENGTH; groupIdx++)
+  {
+    GroupStruct group = GROUPS[groupIdx];
+
+    if (group.active_symbol != "")
+    {
+      continue;
+    }
+
+    for (int symbolIdx = 0; symbolIdx < group.symbols_count; symbolIdx++)
+    {
+      string symbol = group.symbols[symbolIdx];
+      int result = runStrategy1(symbol, lower_timeframe, higher_timeframe);
+      if (result > -1)
+      {
+        group.active_symbol = symbol;
+      }
+    }
+  }
+}
+
+int runStrategy1(string symbol, ENUM_TIMEFRAMES lowTF, ENUM_TIMEFRAMES highTF)
 {
   HigherTFCrossCheckResult maCross = findHigherTimeFrameMACross(symbol, highTF);
   if (maCross.found)
@@ -174,7 +211,7 @@ void runStrategy1(string symbol, ENUM_TIMEFRAMES lowTF, ENUM_TIMEFRAMES highTF)
 
     if (!canCheckSignals)
     {
-      return;
+      return -1;
     }
 
     int firstAreaTouchShift = findAreaTouch(symbol, highTF, maCross.orderEnvironment, maCross.crossCandleShift, PERIOD_CURRENT);
@@ -220,10 +257,14 @@ void runStrategy1(string symbol, ENUM_TIMEFRAMES lowTF, ENUM_TIMEFRAMES highTF)
 
           drawVLine(0, "Order_" + IntegerToString(lastSignal.maChangeShift), clrOrange);
           // breakPoint();
+
+          return orderCalculated.pending == false ? 1 : 2; // 1 = immediate , 2 = pending
         }
       }
     }
   }
+
+  return -1;
 }
 
 HigherTFCrossCheckResult findHigherTimeFrameMACross(string symbol, ENUM_TIMEFRAMES higherTF)
@@ -1025,6 +1066,7 @@ void initializeGroups()
     string symbolsStr = GROUPS_STR[i];
     GroupStruct group;
     StringSplit(symbolsStr, SYMBOL_SEPARATOR, group.symbols);
+    group.symbols_count = ArraySize(group.symbols);
     GROUPS[i] = group;
   }
 }
