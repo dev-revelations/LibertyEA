@@ -239,12 +239,16 @@ void scanSymbolGroups()
       RefreshRates();
       int result = runStrategy1(symbol, lower_timeframe, higher_timeframe, group.active_symbol == "");
 
+      // Agar active symbol ghablan set nashode bud angah symbol ra set mikonim
+      // Be in mani ast ke in symbol avalin symboli hast ke signal midahad
       if (result > 0 && group.active_symbol == "")
       {
         group.active_symbol = symbol;
       }
 
-      // Agar active symbol ghablan set nashode bud angah an ra set mikonim
+      // Agar symbole jari haman symbole montakhab bud
+      // Va agar natije in bud ke symbol mitavanad signale jadid check konad
+      // Be ebarate digar agar faghat symbole active meghdare 0 bargardanad baraye ma ahamiat darad
       if (result == 0 && group.active_symbol == symbol)
       {
         group.active_symbol = "";
@@ -996,6 +1000,8 @@ bool proccessOrders(string symbol, datetime crossTime)
     {
       int orderTime = (int)OrderOpenTime();
       int cross_Time = (int)crossTime;
+
+      // Environment avaz shode ?
       if (orderTime < cross_Time)
       {
         int OP = OrderType();
@@ -1023,6 +1029,7 @@ bool proccessOrders(string symbol, datetime crossTime)
         checkForBreakEven(symbol, pos);
       }
 
+      // Symbol dar liste ordere baz peyda shode, banabarin az checke signale jadid jelogiri mikonim
       return false;
     }
     // FileWrite(handle, OrderTicket(), OrderOpenPrice(), OrderOpenTime(), OrderSymbol(), OrderLots());
