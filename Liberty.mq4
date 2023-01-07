@@ -12,8 +12,8 @@
 
 extern bool SingleChart = true;                                          // Single Chart Scan
 extern bool PrioritizeSameGroup = true;                                  // Prioritize Same Group Symbols
-extern bool EnableEATimer = false;                                       // Enable EA Timer
-extern int EATimerSconds = 2;                                            // EA Timer Interval Seconds
+extern bool EnableEATimer = true;                                        // Enable EA Timer
+extern int EATimerSconds = 10;                                            // EA Timer Interval Seconds
 extern string _separator1 = "=======================================";   // ===== Higher Timeframe =====
 extern ENUM_TIMEFRAMES higher_timeframe = PERIOD_H4;                     // Higher Timeframe
 extern bool Enable_MA_Closing = false;                                   // Enable MA Closing Detection
@@ -172,7 +172,23 @@ void OnDeinit(const int reason)
 void OnTick()
 {
   //---
+  if (!EnableEATimer)
+  {
+    runEA();
+  }
+}
+//+------------------------------------------------------------------+
+void OnTimer()
+{
+  if (EnableEATimer)
+  {
+    // OnTick();
+    runEA();
+  }
+}
 
+void runEA()
+{
   if (!IsTradeAllowed())
   {
     return;
@@ -185,14 +201,6 @@ void OnTick()
   else
   {
     scanSymbolGroups();
-  }
-}
-//+------------------------------------------------------------------+
-void OnTimer()
-{
-  if (EnableEATimer)
-  {
-    OnTick();
   }
 }
 
