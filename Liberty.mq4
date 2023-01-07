@@ -328,9 +328,8 @@ int runStrategy1(string symbol, ENUM_TIMEFRAMES lowTF, ENUM_TIMEFRAMES highTF, b
             Order(symbol, maCross.orderEnvironment, orderCalculated);
             drawVLine(0, "Order_" + IntegerToString(lastSignal.maChangeShift), clrOrange);
             // breakPoint();
-
-            return orderCalculated.pending == false ? 1 : 2; // 1 = immediate , 2 = pending
           }
+          return orderCalculated.pending == false ? 1 : 2; // 1 = immediate , 2 = pending
         }
       }
     }
