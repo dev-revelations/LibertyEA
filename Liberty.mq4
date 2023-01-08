@@ -36,6 +36,14 @@ extern double BreakEvenRatio = 2.75;                                   // Break 
 extern double BreakEvenGapPip = 2;                                     // Break Even Gap Pip
 extern string _separator3 = "======================================="; // ===== Lower TF Settings =====
 extern bool OnlyMaCandleBreaks = true;                                 // Shohld candle break MA?
+extern string _separator4 = "======================================="; // ===== Sessions (Min = 0 , Max = 24) =====
+extern int GMTOffset = 2;                                              // GMT Offset
+extern int SessionStart1 = 0;                                          // Session Start 1
+extern int SessionEnd1 = 24;                                           // Session End 1
+extern int SessionStart2 = 0;                                          // Session Start 2
+extern int SessionEnd2 = 24;                                           // Session End 2
+extern int SessionStart3 = 0;                                          // Session Start 3
+extern int SessionEnd3 = 24;                                           // Session End 3
 extern string _separator5 = "======================================="; // ===== Test & Simulation =====
 extern bool EnableSimulation = false;
 extern int ActiveSignalForTest = 0;
@@ -190,6 +198,13 @@ void OnTimer()
 void runEA()
 {
   if (!IsTradeAllowed())
+  {
+    return;
+  }
+
+  bool isTimeNotAllowed = !TimeFilter(SessionStart1, SessionEnd1) || !TimeFilter(SessionStart2, SessionEnd2) || !TimeFilter(SessionStart3, SessionEnd3);
+
+  if (isTimeNotAllowed)
   {
     return;
   }
@@ -1039,7 +1054,10 @@ bool proccessOrders(string symbol, datetime crossTime)
 
   if (lastHistoryOrderTicket > -1 && OrderSelect(lastHistoryOrderTicket, SELECT_BY_TICKET, MODE_HISTORY) == true)
   {
-    if (symbol == OrderSymbol() && OrderMagicNumber() == MagicNumber)
+    int orderSession = getSessionNumber(OrderOpenTime());
+    int currentSession = getSessionNumber(TimeCurrent());
+
+    if (symbol == OrderSymbol() && OrderMagicNumber() == MagicNumber && orderSession == currentSession)
     {
       int orderTime = (int)OrderOpenTime();
       int cross_Time = (int)crossTime;
@@ -1184,6 +1202,104 @@ bool isOpPending(int op)
   return op == OP_SELLLIMIT || op == OP_BUYLIMIT || op == OP_SELLSTOP || op == OP_BUYSTOP;
 }
 
+bool TimeFilter(int start_time, int end_time)
+{
+  int CurrentHour = TimeHour(TimeCurrent());
+
+  start_time = start_time + (GMTOffset);
+  end_time = end_time + (GMTOffset);
+
+  if (start_time > end_time)
+  {
+    if (CurrentHour < start_time && CurrentHour >= end_time)
+    {
+      return false;
+    }
+    else
+    {
+      return true;
+    }
+  }
+  else
+  {
+    if (CurrentHour >= start_time && CurrentHour < end_time)
+    {
+      return true;
+    }
+    else
+    {
+      return false;
+    }
+  }
+}
+
+bool isInSession(int sessionNumber, datetime time)
+{
+  int timeHour = TimeHour(time);
+
+  int start_time = -1, end_time = -1;
+
+  switch (sessionNumber)
+  {
+  case 1:
+    start_time = SessionStart1 + (GMTOffset);
+    end_time = SessionEnd1 + (GMTOffset);
+    break;
+
+  case 2:
+    start_time = SessionStart2 + (GMTOffset);
+    end_time = SessionEnd2 + (GMTOffset);
+    break;
+
+  case 3:
+    start_time = SessionStart3 + (GMTOffset);
+    end_time = SessionEnd3 + (GMTOffset);
+    break;
+
+  default:
+    break;
+  }
+
+  if (timeHour >= start_time && timeHour <= end_time)
+  {
+    return true;
+  }
+
+  return false;
+}
+
+int getSessionNumber(datetime time)
+{
+  int timeHour = TimeHour(time);
+  int start_time = -1, end_time = -1;
+
+  start_time = SessionStart1 + (GMTOffset);
+  end_time = SessionEnd1 + (GMTOffset);
+
+  if (timeHour >= start_time && timeHour <= end_time)
+  {
+    return 1;
+  }
+
+  start_time = SessionStart2 + (GMTOffset);
+  end_time = SessionEnd2 + (GMTOffset);
+
+  if (timeHour >= start_time && timeHour <= end_time)
+  {
+    return 2;
+  }
+
+  start_time = SessionStart3 + (GMTOffset);
+  end_time = SessionEnd3 + (GMTOffset);
+
+  if (timeHour >= start_time && timeHour <= end_time)
+  {
+    return 3;
+  }
+
+  return -1;
+}
+
 //+------------------------------------------------------------------+
 //|                                                                  |
 //+------------------------------------------------------------------+
@@ -1243,7 +1359,7 @@ void drawArrowObj(int shift, bool up = true, string id = "", double clr = clrAqu
   ObjectSetInteger(0, id2, OBJPROP_WIDTH, 5);
 }
 
-void drawValidationObj(int shift, bool up = true, bool valid = true, string id = "", double clr = C '9,255,9')
+void drawValidationObj(int shift, bool up = true, bool valid = true, string id = "", double clr = C'9,255,9')
 {
   datetime time = iTime(_Symbol, PERIOD_CURRENT, shift);
   double price = up ? iLow(_Symbol, PERIOD_CURRENT, shift) : iHigh(_Symbol, PERIOD_CURRENT, shift);
@@ -1292,18 +1408,18 @@ void simulate(string symbol, ENUM_TIMEFRAMES tf, HigherTFCrossCheckResult &maCro
 
     OrderInfoResult orderCalculated;
 
-    double hsColor = C '60,167,17';
-    double lsColor = C '249,0,0';
+    double hsColor = C'60,167,17';
+    double lsColor = C'249,0,0';
     double orderColor = clrAqua;
-    double depthOfMoveColor = C '207,0,249';
+    double depthOfMoveColor = C'207,0,249';
 
     const int active = ActiveSignalForTest;
 
     if (i == active)
     {
-      lsColor = C '255,230,6';
+      lsColor = C'255,230,6';
       orderColor = clrGreen;
-      depthOfMoveColor = C '249,0,0';
+      depthOfMoveColor = C'249,0,0';
       drawVLine(item.maChangeShift, IntegerToString(item.maChangeShift) + "test", orderColor);
     }
 
@@ -1330,14 +1446,14 @@ void simulate(string symbol, ENUM_TIMEFRAMES tf, HigherTFCrossCheckResult &maCro
 
     orderCalculated = validateOrderDistance(_Symbol, PERIOD_CURRENT, maCross.orderEnvironment, signals, i);
 
-    drawValidationObj(item.maChangeShift, maCross.orderEnvironment == ENV_BUY, orderCalculated.valid, IntegerToString(item.maChangeShift), orderCalculated.valid ? C '9,255,9' : C '249,92,92');
+    drawValidationObj(item.maChangeShift, maCross.orderEnvironment == ENV_BUY, orderCalculated.valid, IntegerToString(item.maChangeShift), orderCalculated.valid ? C'9,255,9' : C'249,92,92');
 
     if (i == active)
     {
       string id = IntegerToString(i);
-      drawHLine(orderCalculated.orderPrice, "_order_" + id, orderCalculated.pending ? C '245,46,219' : C '0,191,73');
-      drawHLine(orderCalculated.slPrice, "_sl_" + id, C '255,5,5');
-      drawHLine(orderCalculated.tpPrice, "_tp_" + id, C '0,119,255');
+      drawHLine(orderCalculated.orderPrice, "_order_" + id, orderCalculated.pending ? C'245,46,219' : C'0,191,73');
+      drawHLine(orderCalculated.slPrice, "_sl_" + id, C'255,5,5');
+      drawHLine(orderCalculated.tpPrice, "_tp_" + id, C'0,119,255');
     }
   }
 }
