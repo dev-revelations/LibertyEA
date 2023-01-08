@@ -202,13 +202,6 @@ void runEA()
     return;
   }
 
-  bool isTimeNotAllowed = !TimeFilter(SessionStart1, SessionEnd1) || !TimeFilter(SessionStart2, SessionEnd2) || !TimeFilter(SessionStart3, SessionEnd3);
-
-  if (isTimeNotAllowed)
-  {
-    return;
-  }
-
   if (SingleChart)
   {
     runStrategy1(_Symbol, lower_timeframe, higher_timeframe);
@@ -303,52 +296,58 @@ int runStrategy1(string symbol, ENUM_TIMEFRAMES lowTF, ENUM_TIMEFRAMES highTF, b
       result = 0;
     }
 
-    int firstAreaTouchShift = findAreaTouch(symbol, highTF, maCross.orderEnvironment, maCross.crossCandleShift, PERIOD_CURRENT);
+    bool isTimeAllowed = TimeFilter(SessionStart1, SessionEnd1) || TimeFilter(SessionStart2, SessionEnd2) || TimeFilter(SessionStart3, SessionEnd3);
 
-    if (firstAreaTouchShift > 0 && maCross.orderEnvironment != ENV_NONE)
+    if (isTimeAllowed)
     {
-      SignalResult signals[];
-      listSignals(signals, symbol, lowTF, maCross.orderEnvironment, firstAreaTouchShift);
 
-      if (EnableSimulation)
-      {
-        simulate(symbol, lowTF, maCross, firstAreaTouchShift, signals);
-        drawVLine(maCross.crossCandleShift, "Order_" + IntegerToString(maCross.crossCandleShift), clrBlanchedAlmond);
-      }
+      int firstAreaTouchShift = findAreaTouch(symbol, highTF, maCross.orderEnvironment, maCross.crossCandleShift, PERIOD_CURRENT);
 
-      int signalsCount = ArraySize(signals);
-      if (signalsCount > 0)
+      if (firstAreaTouchShift > 0 && maCross.orderEnvironment != ENV_NONE)
       {
-        int lastSignalIndex = signalsCount - 1;
-        SignalResult lastSignal = signals[lastSignalIndex];
-        // Validate Signal
-        OrderInfoResult orderCalculated = signalToOrderInfo(symbol, lowTF, maCross.orderEnvironment, lastSignal);
-        orderCalculated = validateOrderDistance(symbol, lowTF, maCross.orderEnvironment, signals, lastSignalIndex);
-        if (lastSignal.maChangeShift >= 0 && lastSignal.maChangeShift <= 2 && orderCalculated.valid)
+        SignalResult signals[];
+        listSignals(signals, symbol, lowTF, maCross.orderEnvironment, firstAreaTouchShift);
+
+        if (EnableSimulation)
         {
-          // open signal
-          if (!orderCalculated.pending)
-          {
-            if (maCross.orderEnvironment == ENV_SELL)
-            {
-              orderCalculated = calculeOrderPlace(symbol, lowTF, maCross.orderEnvironment, 0, lastSignal.highestShift, MarketInfo(symbol, MODE_BID), false);
-              // orderCalculated.orderPrice = ;
-            }
-            else if (maCross.orderEnvironment == ENV_BUY)
-            {
-              // orderCalculated.orderPrice = MarketInfo(symbol, MODE_ASK);
-              orderCalculated = calculeOrderPlace(symbol, lowTF, maCross.orderEnvironment, 0, lastSignal.lowestShift, MarketInfo(symbol, MODE_ASK), false);
-            }
-            orderCalculated.pending = false;
-          }
+          simulate(symbol, lowTF, maCross, firstAreaTouchShift, signals);
+          drawVLine(maCross.crossCandleShift, "Order_" + IntegerToString(maCross.crossCandleShift), clrBlanchedAlmond);
+        }
 
-          if (trade)
+        int signalsCount = ArraySize(signals);
+        if (signalsCount > 0)
+        {
+          int lastSignalIndex = signalsCount - 1;
+          SignalResult lastSignal = signals[lastSignalIndex];
+          // Validate Signal
+          OrderInfoResult orderCalculated = signalToOrderInfo(symbol, lowTF, maCross.orderEnvironment, lastSignal);
+          orderCalculated = validateOrderDistance(symbol, lowTF, maCross.orderEnvironment, signals, lastSignalIndex);
+          if (lastSignal.maChangeShift >= 0 && lastSignal.maChangeShift <= 2 && orderCalculated.valid)
           {
-            Order(symbol, maCross.orderEnvironment, orderCalculated);
-            drawVLine(0, "Order_" + IntegerToString(lastSignal.maChangeShift), clrOrange);
-            // breakPoint();
+            // open signal
+            if (!orderCalculated.pending)
+            {
+              if (maCross.orderEnvironment == ENV_SELL)
+              {
+                orderCalculated = calculeOrderPlace(symbol, lowTF, maCross.orderEnvironment, 0, lastSignal.highestShift, MarketInfo(symbol, MODE_BID), false);
+                // orderCalculated.orderPrice = ;
+              }
+              else if (maCross.orderEnvironment == ENV_BUY)
+              {
+                // orderCalculated.orderPrice = MarketInfo(symbol, MODE_ASK);
+                orderCalculated = calculeOrderPlace(symbol, lowTF, maCross.orderEnvironment, 0, lastSignal.lowestShift, MarketInfo(symbol, MODE_ASK), false);
+              }
+              orderCalculated.pending = false;
+            }
+
+            if (trade)
+            {
+              Order(symbol, maCross.orderEnvironment, orderCalculated);
+              drawVLine(0, "Order_" + IntegerToString(lastSignal.maChangeShift), clrOrange);
+              // breakPoint();
+            }
+            return orderCalculated.pending == false ? 1 : 2; // 1 = immediate , 2 = pending
           }
-          return orderCalculated.pending == false ? 1 : 2; // 1 = immediate , 2 = pending
         }
       }
     }
@@ -1359,7 +1358,7 @@ void drawArrowObj(int shift, bool up = true, string id = "", double clr = clrAqu
   ObjectSetInteger(0, id2, OBJPROP_WIDTH, 5);
 }
 
-void drawValidationObj(int shift, bool up = true, bool valid = true, string id = "", double clr = C'9,255,9')
+void drawValidationObj(int shift, bool up = true, bool valid = true, string id = "", double clr = C '9,255,9')
 {
   datetime time = iTime(_Symbol, PERIOD_CURRENT, shift);
   double price = up ? iLow(_Symbol, PERIOD_CURRENT, shift) : iHigh(_Symbol, PERIOD_CURRENT, shift);
@@ -1408,18 +1407,18 @@ void simulate(string symbol, ENUM_TIMEFRAMES tf, HigherTFCrossCheckResult &maCro
 
     OrderInfoResult orderCalculated;
 
-    double hsColor = C'60,167,17';
-    double lsColor = C'249,0,0';
+    double hsColor = C '60,167,17';
+    double lsColor = C '249,0,0';
     double orderColor = clrAqua;
-    double depthOfMoveColor = C'207,0,249';
+    double depthOfMoveColor = C '207,0,249';
 
     const int active = ActiveSignalForTest;
 
     if (i == active)
     {
-      lsColor = C'255,230,6';
+      lsColor = C '255,230,6';
       orderColor = clrGreen;
-      depthOfMoveColor = C'249,0,0';
+      depthOfMoveColor = C '249,0,0';
       drawVLine(item.maChangeShift, IntegerToString(item.maChangeShift) + "test", orderColor);
     }
 
@@ -1446,14 +1445,14 @@ void simulate(string symbol, ENUM_TIMEFRAMES tf, HigherTFCrossCheckResult &maCro
 
     orderCalculated = validateOrderDistance(_Symbol, PERIOD_CURRENT, maCross.orderEnvironment, signals, i);
 
-    drawValidationObj(item.maChangeShift, maCross.orderEnvironment == ENV_BUY, orderCalculated.valid, IntegerToString(item.maChangeShift), orderCalculated.valid ? C'9,255,9' : C'249,92,92');
+    drawValidationObj(item.maChangeShift, maCross.orderEnvironment == ENV_BUY, orderCalculated.valid, IntegerToString(item.maChangeShift), orderCalculated.valid ? C '9,255,9' : C '249,92,92');
 
     if (i == active)
     {
       string id = IntegerToString(i);
-      drawHLine(orderCalculated.orderPrice, "_order_" + id, orderCalculated.pending ? C'245,46,219' : C'0,191,73');
-      drawHLine(orderCalculated.slPrice, "_sl_" + id, C'255,5,5');
-      drawHLine(orderCalculated.tpPrice, "_tp_" + id, C'0,119,255');
+      drawHLine(orderCalculated.orderPrice, "_order_" + id, orderCalculated.pending ? C '245,46,219' : C '0,191,73');
+      drawHLine(orderCalculated.slPrice, "_sl_" + id, C '255,5,5');
+      drawHLine(orderCalculated.tpPrice, "_tp_" + id, C '0,119,255');
     }
   }
 }
