@@ -214,9 +214,15 @@ void runEA()
 
 void scanSymbolGroups()
 {
+  string activeSymbolsList = "";
   for (int groupIdx = 0; groupIdx < GROUPS_LENGTH; groupIdx++)
   {
     GroupStruct group = GROUPS[groupIdx];
+
+    if (group.active_symbol != "")
+    {
+      activeSymbolsList += group.active_symbol + "\n";
+    }
 
     bool isActiveSymPending = true;
     int activeTicket = -1;
@@ -276,6 +282,11 @@ void scanSymbolGroups()
 
     GROUPS[groupIdx] = group; // Hatman bayad dobare set shavad ta taghirat emal shavad
   }
+
+  Comment(
+      "Current Session: " + IntegerToString(getSessionNumber(TimeCurrent())),
+      "\nActive Symbols:\n",
+      activeSymbolsList);
 }
 
 int runStrategy1(string symbol, ENUM_TIMEFRAMES lowTF, ENUM_TIMEFRAMES highTF, bool trade = true)
