@@ -38,10 +38,13 @@ extern string _separator3 = "======================================="; // ===== 
 extern bool OnlyMaCandleBreaks = true;                                 // Shohld candle break MA?
 extern string _separator4 = "======================================="; // ===== Sessions (Min = 0 , Max = 24) =====
 extern int GMTOffset = 2;                                              // GMT Offset
+extern bool EnableTradingSession1 = true;                              // Enable Trading in Session 1
 extern int SessionStart1 = 0;                                          // Session Start 1
 extern int SessionEnd1 = 24;                                           // Session End 1
+extern bool EnableTradingSession2 = true;                              // Enable Trading in Session 2
 extern int SessionStart2 = 0;                                          // Session Start 2
 extern int SessionEnd2 = 24;                                           // Session End 2
+extern bool EnableTradingSession3 = true;                              // Enable Trading in Session 3
 extern int SessionStart3 = 0;                                          // Session Start 3
 extern int SessionEnd3 = 24;                                           // Session End 3
 extern string _separator5 = "======================================="; // ===== Test & Simulation =====
@@ -309,7 +312,7 @@ int runStrategy1(string symbol, ENUM_TIMEFRAMES lowTF, ENUM_TIMEFRAMES highTF, b
 
     bool isTimeAllowed = TimeFilter(SessionStart1, SessionEnd1) || TimeFilter(SessionStart2, SessionEnd2) || TimeFilter(SessionStart3, SessionEnd3);
 
-    if (isTimeAllowed)
+    if (isTimeAllowed && isTradingEnabledInCurrentSession())
     {
 
       int firstAreaTouchShift = findAreaTouch(symbol, highTF, maCross.orderEnvironment, maCross.crossCandleShift, PERIOD_CURRENT);
@@ -1355,6 +1358,32 @@ int getSessionNumber(datetime time)
   }
 
   return -1;
+}
+
+bool isTradingEnabledIn(int session)
+{
+  switch (session)
+  {
+  case 1:
+    return EnableTradingSession1;
+    break;
+  case 2:
+    return EnableTradingSession2;
+    break;
+  case 3:
+    return EnableTradingSession3;
+    break;
+
+  default:
+    break;
+  }
+
+  return false;
+}
+
+bool isTradingEnabledInCurrentSession()
+{
+  return isTradingEnabledIn(getSessionNumber(TimeCurrent()));
 }
 
 bool sessionsEqual(int session1, int session2)
