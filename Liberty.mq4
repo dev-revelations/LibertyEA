@@ -1087,7 +1087,7 @@ bool proccessOrders(string symbol, datetime crossTime)
           int currentSession = getSessionNumber(TimeCurrent());
           // Agar single chart nabud sessione jadid baraye symbole profit dar
           // Zamani ast ke sessione trade ba sessione alan barabar nabashad
-          if (orderSession == currentSession)
+          if (sessionsEqual(orderSession, currentSession))
           {
             return false;
           }
@@ -1217,7 +1217,7 @@ void initializeGroups()
       {
         int orderSession = getSessionNumber(OrderOpenTime());
         int currentSession = getSessionNumber(TimeCurrent());
-        if (orderSession == currentSession)
+        if (sessionsEqual(orderSession, currentSession))
         {
           group.active_symbol = sym;
           break;
@@ -1231,7 +1231,7 @@ void initializeGroups()
         int orderSession = getSessionNumber(OrderOpenTime());
         int currentSession = getSessionNumber(TimeCurrent());
 
-        if (sym == OrderSymbol() && OrderMagicNumber() == MagicNumber && orderSession == currentSession)
+        if (sym == OrderSymbol() && OrderMagicNumber() == MagicNumber && sessionsEqual(orderSession, currentSession))
         {
           // Already made profit in the current crossing session
           bool hadProfit = OrderProfit() >= 0; // OrderClosePrice() >= OrderTakeProfit();
@@ -1286,34 +1286,37 @@ bool TimeFilter(int start_time, int end_time)
 
 bool isInSession(int sessionNumber, datetime time)
 {
-  int timeHour = TimeHour(time);
-
-  int start_time = -1, end_time = -1;
-
-  switch (sessionNumber)
+  if (TimeDay(TimeLocal()) == TimeDay(time))
   {
-  case 1:
-    start_time = SessionStart1 + (GMTOffset);
-    end_time = SessionEnd1 + (GMTOffset);
-    break;
+    int timeHour = TimeHour(time);
 
-  case 2:
-    start_time = SessionStart2 + (GMTOffset);
-    end_time = SessionEnd2 + (GMTOffset);
-    break;
+    int start_time = -1, end_time = -1;
 
-  case 3:
-    start_time = SessionStart3 + (GMTOffset);
-    end_time = SessionEnd3 + (GMTOffset);
-    break;
+    switch (sessionNumber)
+    {
+    case 1:
+      start_time = SessionStart1 + (GMTOffset);
+      end_time = SessionEnd1 + (GMTOffset);
+      break;
 
-  default:
-    break;
-  }
+    case 2:
+      start_time = SessionStart2 + (GMTOffset);
+      end_time = SessionEnd2 + (GMTOffset);
+      break;
 
-  if (timeHour >= start_time && timeHour <= end_time)
-  {
-    return true;
+    case 3:
+      start_time = SessionStart3 + (GMTOffset);
+      end_time = SessionEnd3 + (GMTOffset);
+      break;
+
+    default:
+      break;
+    }
+
+    if (timeHour >= start_time && timeHour <= end_time)
+    {
+      return true;
+    }
   }
 
   return false;
@@ -1321,34 +1324,42 @@ bool isInSession(int sessionNumber, datetime time)
 
 int getSessionNumber(datetime time)
 {
-  int timeHour = TimeHour(time);
-  int start_time = -1, end_time = -1;
-
-  start_time = SessionStart1 + (GMTOffset);
-  end_time = SessionEnd1 + (GMTOffset);
-
-  if (timeHour >= start_time && timeHour <= end_time)
+  if (TimeDay(TimeLocal()) == TimeDay(time))
   {
-    return 1;
-  }
+    int timeHour = TimeHour(time);
+    int start_time = -1, end_time = -1;
 
-  start_time = SessionStart2 + (GMTOffset);
-  end_time = SessionEnd2 + (GMTOffset);
+    start_time = SessionStart1 + (GMTOffset);
+    end_time = SessionEnd1 + (GMTOffset);
 
-  if (timeHour >= start_time && timeHour <= end_time)
-  {
-    return 2;
-  }
+    if (timeHour >= start_time && timeHour <= end_time)
+    {
+      return 1;
+    }
 
-  start_time = SessionStart3 + (GMTOffset);
-  end_time = SessionEnd3 + (GMTOffset);
+    start_time = SessionStart2 + (GMTOffset);
+    end_time = SessionEnd2 + (GMTOffset);
 
-  if (timeHour >= start_time && timeHour <= end_time)
-  {
-    return 3;
+    if (timeHour >= start_time && timeHour <= end_time)
+    {
+      return 2;
+    }
+
+    start_time = SessionStart3 + (GMTOffset);
+    end_time = SessionEnd3 + (GMTOffset);
+
+    if (timeHour >= start_time && timeHour <= end_time)
+    {
+      return 3;
+    }
   }
 
   return -1;
+}
+
+bool sessionsEqual(int session1, int session2)
+{
+  return session1 == session2 && session1 > -1 && session2 > -1;
 }
 
 //+------------------------------------------------------------------+
