@@ -31,22 +31,25 @@ extern double AverageCandleSizeRatio = 2.25;
 extern int AverageCandleSizePeriod = 40;
 extern int PendingsExpirationMinutes = 1000;
 extern string CommentText = "";
-extern bool EnableBreakEven = true;                                    // Enable Break Even
-extern double BreakEvenRatio = 2.75;                                   // Break Even Ratio
-extern double BreakEvenGapPip = 2;                                     // Break Even Gap Pip
-extern string _separator3 = "======================================="; // ===== Lower TF Settings =====
-extern bool OnlyMaCandleBreaks = true;                                 // Shohld candle break MA?
-extern string _separator4 = "======================================="; // ===== Sessions (Min = 0 , Max = 24) =====
-extern int GMTOffset = 2;                                              // GMT Offset
-extern bool EnableTradingSession1 = true;                              // Enable Trading in Session 1
-extern int SessionStart1 = 0;                                          // Session Start 1
-extern int SessionEnd1 = 24;                                           // Session End 1
-extern bool EnableTradingSession2 = true;                              // Enable Trading in Session 2
-extern int SessionStart2 = 0;                                          // Session Start 2
-extern int SessionEnd2 = 24;                                           // Session End 2
-extern bool EnableTradingSession3 = true;                              // Enable Trading in Session 3
-extern int SessionStart3 = 0;                                          // Session Start 3
-extern int SessionEnd3 = 24;                                           // Session End 3
+extern bool EnableBreakEven = true;                                      // Enable Break Even
+extern double BreakEvenRatio = 2.75;                                     // Break Even Ratio
+extern double BreakEvenGapPip = 2;                                       // Break Even Gap Pip
+extern string _separator3 = "=======================================";   // ===== Lower TF Settings =====
+extern bool OnlyMaCandleBreaks = true;                                   // Shohld candle break MA?
+extern string _separator4 = "=======================================";   // ===== Sessions (Min = 0 , Max = 24) =====
+extern int GMTOffset = 2;                                                // GMT Offset
+extern bool EnableTradingSession1 = true;                                // Enable Trading in Session 1
+extern int SessionStart1 = 0;                                            // Session Start 1
+extern int SessionEnd1 = 24;                                             // Session End 1
+extern bool EnableTradingSession2 = true;                                // Enable Trading in Session 2
+extern int SessionStart2 = 0;                                            // Session Start 2
+extern int SessionEnd2 = 24;                                             // Session End 2
+extern bool EnableTradingSession3 = true;                                // Enable Trading in Session 3
+extern int SessionStart3 = 0;                                            // Session Start 3
+extern int SessionEnd3 = 24;                                             // Session End 3
+extern string _separator4_1 = "======================================="; // ===== Custom Groups =====
+extern string CustomGroup1 = "GER30.cash FRA40.cash EU50.cash UK100.cash US30.cash US100.cash US500.cash";
+extern string CustomGroup2 = "USOIL.cash";
 extern string _separator5 = "======================================="; // ===== Test & Simulation =====
 extern bool EnableSimulation = false;
 extern int ActiveSignalForTest = 0;
@@ -73,8 +76,7 @@ string GROUPS_STR[] = {
     "USDCAD EURCAD GBPCAD AUDCAD NZDCAD",
     "EURNZD GBPNZD AUDNZD",
     "EURAUD GBPAUD",
-    "EURGBP",
-    "GER30.cash FRA40.cash EU50.cash UK100.cash US30.cash US100.cash US500.cash USOIL.cash"};
+    "EURGBP"};
 
 const ushort SYMBOL_SEPARATOR = ' ';
 GroupStruct GROUPS[];
@@ -1202,6 +1204,21 @@ void checkForBreakEven(string symbol, int orderIndex)
 void initializeGroups()
 {
   GROUPS_LENGTH = ArraySize(GROUPS_STR);
+
+  if (StringLen(CustomGroup1) > 0)
+  {
+    GROUPS_LENGTH++;
+    ArrayResize(GROUPS_STR, GROUPS_LENGTH);
+    GROUPS_STR[GROUPS_LENGTH - 1] = CustomGroup1;
+  }
+
+  if (StringLen(CustomGroup2) > 0)
+  {
+    GROUPS_LENGTH++;
+    ArrayResize(GROUPS_STR, GROUPS_LENGTH);
+    GROUPS_STR[GROUPS_LENGTH - 1] = CustomGroup2;
+  }
+
   ArrayResize(GROUPS, GROUPS_LENGTH);
   for (int i = 0; i < GROUPS_LENGTH; i++)
   {
