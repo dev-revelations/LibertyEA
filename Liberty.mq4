@@ -1053,18 +1053,34 @@ bool proccessOrders(string symbol, datetime crossTime)
 
   if (lastHistoryOrderTicket > -1 && OrderSelect(lastHistoryOrderTicket, SELECT_BY_TICKET, MODE_HISTORY) == true)
   {
-    int orderSession = getSessionNumber(OrderOpenTime());
-    int currentSession = getSessionNumber(TimeCurrent());
-
-    if (symbol == OrderSymbol() && OrderMagicNumber() == MagicNumber && orderSession == currentSession)
+    if (symbol == OrderSymbol() && OrderMagicNumber() == MagicNumber)
     {
-      int orderTime = (int)OrderOpenTime();
-      int cross_Time = (int)crossTime;
-      // Already made profit in the current crossing session
       bool hadProfit = OrderProfit() >= 0; // OrderClosePrice() >= OrderTakeProfit();
-      if (orderTime > cross_Time && hadProfit)
+      if (hadProfit)
       {
-        return false;
+        if (SingleChart)
+        {
+          // Dar halate single chart sessione jadid baraye symbole profit dar
+          // bar asase crossinge jadid khahad bud
+          int orderTime = (int)OrderOpenTime();
+          int cross_Time = (int)crossTime;
+          // Already made profit in the current crossing session
+          if (orderTime > cross_Time)
+          {
+            return false;
+          }
+        }
+        else
+        {
+          int orderSession = getSessionNumber(OrderOpenTime());
+          int currentSession = getSessionNumber(TimeCurrent());
+          // Agar single chart nabud sessione jadid baraye symbole profit dar
+          // Zamani ast ke sessione trade ba sessione alan barabar nabashad
+          if (orderSession == currentSession)
+          {
+            return false;
+          }
+        }
       }
     }
   }
@@ -1186,12 +1202,37 @@ void initializeGroups()
     {
       string sym = group.symbols[symIndex];
       int ticket = selectOpenOrderTicketFor(sym);
-      if (ticket > -1)
+      if (ticket > -1 && OrderSelect(ticket, SELECT_BY_TICKET) == true && sym == OrderSymbol() && OrderMagicNumber() == MagicNumber)
       {
-        group.active_symbol = sym;
-        break;
+        int orderSession = getSessionNumber(OrderOpenTime());
+        int currentSession = getSessionNumber(TimeCurrent());
+        if (orderSession == currentSession)
+        {
+          group.active_symbol = sym;
+          break;
+        }
+      }
+
+      int lastHistoryOrderTicket = selectLastHistoryOrderTicketFor(sym);
+
+      if (lastHistoryOrderTicket > -1 && OrderSelect(lastHistoryOrderTicket, SELECT_BY_TICKET, MODE_HISTORY) == true)
+      {
+        int orderSession = getSessionNumber(OrderOpenTime());
+        int currentSession = getSessionNumber(TimeCurrent());
+
+        if (sym == OrderSymbol() && OrderMagicNumber() == MagicNumber && orderSession == currentSession)
+        {
+          // Already made profit in the current crossing session
+          bool hadProfit = OrderProfit() >= 0; // OrderClosePrice() >= OrderTakeProfit();
+          if (hadProfit)
+          {
+            group.active_symbol = sym;
+            break;
+          }
+        }
       }
     }
+
     GROUPS[i] = group;
   }
 }
@@ -1358,7 +1399,7 @@ void drawArrowObj(int shift, bool up = true, string id = "", double clr = clrAqu
   ObjectSetInteger(0, id2, OBJPROP_WIDTH, 5);
 }
 
-void drawValidationObj(int shift, bool up = true, bool valid = true, string id = "", double clr = C '9,255,9')
+void drawValidationObj(int shift, bool up = true, bool valid = true, string id = "", double clr = C'9,255,9')
 {
   datetime time = iTime(_Symbol, PERIOD_CURRENT, shift);
   double price = up ? iLow(_Symbol, PERIOD_CURRENT, shift) : iHigh(_Symbol, PERIOD_CURRENT, shift);
@@ -1407,18 +1448,18 @@ void simulate(string symbol, ENUM_TIMEFRAMES tf, HigherTFCrossCheckResult &maCro
 
     OrderInfoResult orderCalculated;
 
-    double hsColor = C '60,167,17';
-    double lsColor = C '249,0,0';
+    double hsColor = C'60,167,17';
+    double lsColor = C'249,0,0';
     double orderColor = clrAqua;
-    double depthOfMoveColor = C '207,0,249';
+    double depthOfMoveColor = C'207,0,249';
 
     const int active = ActiveSignalForTest;
 
     if (i == active)
     {
-      lsColor = C '255,230,6';
+      lsColor = C'255,230,6';
       orderColor = clrGreen;
-      depthOfMoveColor = C '249,0,0';
+      depthOfMoveColor = C'249,0,0';
       drawVLine(item.maChangeShift, IntegerToString(item.maChangeShift) + "test", orderColor);
     }
 
@@ -1445,14 +1486,14 @@ void simulate(string symbol, ENUM_TIMEFRAMES tf, HigherTFCrossCheckResult &maCro
 
     orderCalculated = validateOrderDistance(_Symbol, PERIOD_CURRENT, maCross.orderEnvironment, signals, i);
 
-    drawValidationObj(item.maChangeShift, maCross.orderEnvironment == ENV_BUY, orderCalculated.valid, IntegerToString(item.maChangeShift), orderCalculated.valid ? C '9,255,9' : C '249,92,92');
+    drawValidationObj(item.maChangeShift, maCross.orderEnvironment == ENV_BUY, orderCalculated.valid, IntegerToString(item.maChangeShift), orderCalculated.valid ? C'9,255,9' : C'249,92,92');
 
     if (i == active)
     {
       string id = IntegerToString(i);
-      drawHLine(orderCalculated.orderPrice, "_order_" + id, orderCalculated.pending ? C '245,46,219' : C '0,191,73');
-      drawHLine(orderCalculated.slPrice, "_sl_" + id, C '255,5,5');
-      drawHLine(orderCalculated.tpPrice, "_tp_" + id, C '0,119,255');
+      drawHLine(orderCalculated.orderPrice, "_order_" + id, orderCalculated.pending ? C'245,46,219' : C'0,191,73');
+      drawHLine(orderCalculated.slPrice, "_sl_" + id, C'255,5,5');
+      drawHLine(orderCalculated.tpPrice, "_tp_" + id, C'0,119,255');
     }
   }
 }
