@@ -13,7 +13,8 @@
 extern bool SingleChart = false;                                         // Single Chart Scan
 extern bool PrioritizeSameGroup = true;                                  // Prioritize Same Group Symbols
 extern bool EnableEATimer = true;                                        // Enable EA Timer
-extern int EATimerSconds = 5;                                            // EA Timer Interval Seconds
+extern int EATimerSconds = 1;                                            // EA Timer Interval Seconds
+extern bool CheckSignalsOnNewCandle = true;                              // Check for signals on new candle openning
 extern string _separator1 = "=======================================";   // ===== Higher Timeframe =====
 extern ENUM_TIMEFRAMES higher_timeframe = PERIOD_H4;                     // Higher Timeframe
 extern bool Enable_MA_Closing = false;                                   // Enable MA Closing Detection
@@ -61,6 +62,7 @@ struct GroupStruct
   string active_symbol_buy;
   string active_symbol_sell;
   int symbols_count;
+  int bars[];
 
   GroupStruct()
   {
@@ -215,6 +217,8 @@ void OnTimer()
 
 void runEA()
 {
+  processEAOrders();
+
   if (!IsTradeAllowed())
   {
     return;
@@ -304,6 +308,20 @@ void scanSymbolGroups()
         continue;
       }
 
+      // Check for new bars
+      if (CheckSignalsOnNewCandle)
+      {
+        int bars = iBars(symbol, lower_timeframe);
+        if (group.bars[symbolIdx] == bars)
+        {
+          continue;
+        }
+        else
+        {
+          group.bars[symbolIdx] = bars;
+        }
+      }
+
       // This will happen only if prioritization is disabled
       bool shouldIgnoreSym = !PrioritizeSameGroup && availableEnvInGroup == ENV_NONE && group.active_symbol_buy != symbol && group.active_symbol_sell != symbol;
 
@@ -381,7 +399,7 @@ StrategyStatus runStrategy1(string symbol, ENUM_TIMEFRAMES lowTF, ENUM_TIMEFRAME
   if (maCross.found)
   {
 
-    const bool canCheckSignals = proccessOrders(symbol, maCross.crossTime);
+    const bool canCheckSignals = processOrders(symbol, maCross.crossTime);
 
     if (!canCheckSignals)
     {
@@ -1109,7 +1127,7 @@ int Order(string symbol, OrderEnvironment orderEnv, OrderInfoResult &orderInfo, 
       Green);
 }
 
-bool proccessOrders(string symbol, datetime crossTime)
+bool processOrders(string symbol, datetime crossTime)
 {
   int total = OrdersTotal();
   for (int pos = 0; pos < total; pos++)
@@ -1193,6 +1211,23 @@ bool proccessOrders(string symbol, datetime crossTime)
   }
 
   return true;
+}
+
+void processEAOrders()
+{
+
+  int total = OrdersTotal();
+  for (int pos = 0; pos < total; pos++)
+  {
+    if (OrderSelect(pos, SELECT_BY_POS) == false)
+      continue;
+
+    if (EnableBreakEven)
+    {
+      checkForBreakEven(OrderSymbol(), pos);
+    }
+    // FileWrite(handle, OrderTicket(), OrderOpenPrice(), OrderOpenTime(), OrderSymbol(), OrderLots());
+  }
 }
 
 int selectLastHistoryOrderTicketFor(string symbol)
@@ -1317,6 +1352,9 @@ void initializeGroups()
     GroupStruct group;
     StringSplit(symbolsStr, SYMBOL_SEPARATOR, group.symbols);
     group.symbols_count = ArraySize(group.symbols);
+
+    ArrayResize(group.bars, group.symbols_count);
+    ArrayFill(group.bars, 0, group.symbols_count, 0);
 
     // Check mikonim agar zamane baz shodane EA orderhaye bazi dashtim ke marboot be symbol bud
     // An symbol ra be onvane active symbole marboot be group set mikonim
