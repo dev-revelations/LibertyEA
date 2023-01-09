@@ -10,10 +10,10 @@
 
 #include <WinUser32.mqh>
 
-extern bool SingleChart = true;                                          // Single Chart Scan
+extern bool SingleChart = false;                                         // Single Chart Scan
 extern bool PrioritizeSameGroup = true;                                  // Prioritize Same Group Symbols
 extern bool EnableEATimer = true;                                        // Enable EA Timer
-extern int EATimerSconds = 10;                                           // EA Timer Interval Seconds
+extern int EATimerSconds = 5;                                            // EA Timer Interval Seconds
 extern string _separator1 = "=======================================";   // ===== Higher Timeframe =====
 extern ENUM_TIMEFRAMES higher_timeframe = PERIOD_H4;                     // Higher Timeframe
 extern bool Enable_MA_Closing = false;                                   // Enable MA Closing Detection
@@ -21,6 +21,7 @@ extern double MA_Closing_AverageCandleSize_Ratio = 2;                    // MA c
 extern int MA_Closing_Delay = 2;                                         // Number of higher TF candles should wait
 extern string _separator1_1 = "======================================="; // ===== Lower Timeframe =====
 extern ENUM_TIMEFRAMES lower_timeframe = PERIOD_M5;                      // Lower Timeframe (Never select current)
+extern bool OnlyMaCandleBreaks = true;                                   // Shohld candle break MA?
 extern string _separator2 = "=======================================";   // ===== Order Settings =====
 extern int MagicNumber = 1111;
 extern double RiskPercent = 1;
@@ -32,21 +33,19 @@ extern int AverageCandleSizePeriod = 40;
 extern int PendingsExpirationMinutes = 300;
 extern string CommentText = "";
 extern bool EnableBreakEven = true;                                      // Enable Break Even
-extern double BreakEvenRatio = 2.75;                                     // Break Even Ratio
+extern double BreakEvenRatio = 2.5;                                      // Break Even Ratio
 extern double BreakEvenGapPip = 2;                                       // Break Even Gap Pip
-extern string _separator3 = "=======================================";   // ===== Lower TF Settings =====
-extern bool OnlyMaCandleBreaks = true;                                   // Shohld candle break MA?
 extern string _separator4 = "=======================================";   // ===== Sessions (Min = 0 , Max = 24) =====
 extern int GMTOffset = 2;                                                // GMT Offset
 extern bool EnableTradingSession1 = true;                                // Enable Trading in Session 1
 extern int SessionStart1 = 0;                                            // Session Start 1
-extern int SessionEnd1 = 24;                                             // Session End 1
-extern bool EnableTradingSession2 = true;                                // Enable Trading in Session 2
-extern int SessionStart2 = 0;                                            // Session Start 2
-extern int SessionEnd2 = 24;                                             // Session End 2
-extern bool EnableTradingSession3 = true;                                // Enable Trading in Session 3
-extern int SessionStart3 = 0;                                            // Session Start 3
-extern int SessionEnd3 = 24;                                             // Session End 3
+extern int SessionEnd1 = 17;                                             // Session End 1
+extern bool EnableTradingSession2 = false;                               // Enable Trading in Session 2
+extern int SessionStart2 = 18;                                           // Session Start 2
+extern int SessionEnd2 = 23;                                             // Session End 2
+extern bool EnableTradingSession3 = false;                               // Enable Trading in Session 3
+extern int SessionStart3 = 18;                                           // Session Start 3
+extern int SessionEnd3 = 23;                                             // Session End 3
 extern string _separator4_1 = "======================================="; // ===== Custom Groups =====
 extern string CustomGroup1 = "GER30.cash FRA40.cash EU50.cash UK100.cash US30.cash US100.cash US500.cash";
 extern string CustomGroup2 = "USOIL.cash";
