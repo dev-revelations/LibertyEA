@@ -29,7 +29,7 @@ extern double TakeProfitRatio = 3;
 extern double StopLossGapInAverageCandleSize = 0.2;
 extern double AverageCandleSizeRatio = 2.25;
 extern int AverageCandleSizePeriod = 40;
-extern int PendingsExpirationMinutes = 1000;
+extern int PendingsExpirationMinutes = 300;
 extern string CommentText = "";
 extern bool EnableBreakEven = true;                                      // Enable Break Even
 extern double BreakEvenRatio = 2.75;                                     // Break Even Ratio
@@ -59,12 +59,14 @@ extern int ActiveSignalForTest = 0;
 struct GroupStruct
 {
   string symbols[];
-  string active_symbol;
+  string active_symbol_buy;
+  string active_symbol_sell;
   int symbols_count;
 
   GroupStruct()
   {
-    active_symbol = "";
+    active_symbol_buy = "";
+    active_symbol_sell = "";
     symbols_count = 0;
   }
 };
@@ -88,7 +90,8 @@ enum OrderEnvironment
 {
   ENV_NONE,
   ENV_BUY,
-  ENV_SELL
+  ENV_SELL,
+  ENV_BOTH
 };
 
 enum MaDirection
@@ -96,6 +99,16 @@ enum MaDirection
   MA_NONE,
   MA_UP,
   MA_DOWN
+};
+
+enum StrategyStatus
+{
+  STRATEGY_STATUS_LOCKED,
+  STRATEGY_STATUS_CHECKING_SIGNALS,
+  STRATEGY_STATUS_IMMEDIATE_BUY,
+  STRATEGY_STATUS_PENDING_BUY,
+  STRATEGY_STATUS_IMMEDIATE_SELL,
+  STRATEGY_STATUS_PENDING_SELL
 };
 
 struct LowMaChangeResult
@@ -154,6 +167,7 @@ struct OrderInfoResult
     valid = false;
   }
 };
+
 //+------------------------------------------------------------------+
 //| Expert initialization function                                   |
 //+------------------------------------------------------------------+
@@ -219,27 +233,68 @@ void runEA()
 
 void scanSymbolGroups()
 {
-  string activeSymbolsList = "";
+  string activeSymbolsListBuy = "";
+  string activeSymbolsListSell = "";
   for (int groupIdx = 0; groupIdx < GROUPS_LENGTH; groupIdx++)
   {
     GroupStruct group = GROUPS[groupIdx];
 
-    if (group.active_symbol != "")
+    ////////////// Define Available Order Environments For The Group //////////////
+
+    OrderEnvironment availableEnvInGroup = ENV_BOTH;
+
+    if (group.active_symbol_buy != "" && group.active_symbol_sell == "")
     {
-      activeSymbolsList += group.active_symbol + "\n";
+      availableEnvInGroup = ENV_SELL;
+    }
+    else if (group.active_symbol_sell != "" && group.active_symbol_buy == "")
+    {
+      availableEnvInGroup = ENV_BUY;
+    }
+    else if (group.active_symbol_sell != "" && group.active_symbol_buy != "")
+    {
+      availableEnvInGroup = ENV_NONE;
     }
 
-    bool isActiveSymPending = true;
-    int activeTicket = -1;
-    if (PrioritizeSameGroup && group.active_symbol != "")
+    ////////////// Adding Active Symbols to the Comment //////////////
+
+    if (group.active_symbol_buy != "")
     {
-      activeTicket = selectOpenOrderTicketFor(group.active_symbol);
-      if (activeTicket > -1)
+      activeSymbolsListBuy += group.active_symbol_buy + "\n";
+    }
+
+    if (group.active_symbol_sell != "")
+    {
+      activeSymbolsListSell += group.active_symbol_sell + "\n";
+    }
+
+    ////////////// Define Prioritization For The Active Symbols //////////////
+
+    bool isActiveSymPendingSell = true;
+    int activeTicketSell = -1;
+    if (PrioritizeSameGroup && group.active_symbol_sell != "")
+    {
+      activeTicketSell = selectOpenOrderTicketFor(group.active_symbol_sell);
+      if (activeTicketSell > -1)
       {
         int OP = OrderType();
-        isActiveSymPending = isOpPending(OP);
+        isActiveSymPendingSell = isOpPending(OP);
       }
     }
+
+    bool isActiveSymPendingBuy = true;
+    int activeTicketBuy = -1;
+    if (PrioritizeSameGroup && group.active_symbol_buy != "")
+    {
+      activeTicketBuy = selectOpenOrderTicketFor(group.active_symbol_buy);
+      if (activeTicketBuy > -1)
+      {
+        int OP = OrderType();
+        isActiveSymPendingBuy = isOpPending(OP);
+      }
+    }
+
+    ////////////// Scanning Symbols In The Current Group //////////////
 
     for (int symbolIdx = 0; symbolIdx < group.symbols_count; symbolIdx++)
     {
@@ -250,37 +305,61 @@ void scanSymbolGroups()
         continue;
       }
 
-      if (group.active_symbol != "" && group.active_symbol != symbol && !PrioritizeSameGroup)
+      // This will happen only if prioritization is disabled
+      bool shouldIgnoreSym = !PrioritizeSameGroup && availableEnvInGroup == ENV_NONE && group.active_symbol_buy != symbol && group.active_symbol_sell != symbol;
+
+      if (shouldIgnoreSym)
       {
         continue;
       }
 
       RefreshRates();
-      int result = runStrategy1(symbol, lower_timeframe, higher_timeframe, group.active_symbol == "");
+      StrategyStatus result = runStrategy1(symbol, lower_timeframe, higher_timeframe, availableEnvInGroup != ENV_NONE, availableEnvInGroup);
 
       // Agar active symbol ghablan set nashode bud angah symbol ra set mikonim
       // Be in mani ast ke in symbol avalin symboli hast ke signal midahad
-      if (result > 0 && group.active_symbol == "")
+      if ((result == STRATEGY_STATUS_IMMEDIATE_BUY || result == STRATEGY_STATUS_PENDING_BUY) && group.active_symbol_buy == "")
       {
-        group.active_symbol = symbol;
+        group.active_symbol_buy = symbol;
+      }
+      else if ((result == STRATEGY_STATUS_IMMEDIATE_SELL || result == STRATEGY_STATUS_PENDING_SELL) && group.active_symbol_sell == "")
+      {
+        group.active_symbol_sell = symbol;
       }
 
       // Agar symbole jari haman symbole montakhab bud
       // Va agar natije in bud ke symbol mitavanad signale jadid check konad
       // Be ebarate digar agar faghat symbole active meghdare 0 bargardanad baraye ma ahamiat darad
-      if (result == 0 && group.active_symbol == symbol)
+      if (result == STRATEGY_STATUS_CHECKING_SIGNALS && group.active_symbol_buy == symbol)
       {
-        group.active_symbol = "";
+        group.active_symbol_buy = "";
       }
 
-      bool canReplaceExistingPendingInCurrentGroup = PrioritizeSameGroup && group.active_symbol != symbol && group.active_symbol != "" && isActiveSymPending && result == 1;
+      if (result == STRATEGY_STATUS_CHECKING_SIGNALS && group.active_symbol_sell == symbol)
+      {
+        group.active_symbol_sell = "";
+      }
+
+      // Jaygozinie ordere pending ba ordere Immediate
+      bool canReplaceExistingPendingInCurrentGroup = PrioritizeSameGroup && group.active_symbol_buy != symbol && group.active_symbol_buy != "" && isActiveSymPendingBuy && result == STRATEGY_STATUS_IMMEDIATE_BUY;
       if (canReplaceExistingPendingInCurrentGroup)
       {
-        result = runStrategy1(symbol, lower_timeframe, higher_timeframe);
-        if (result == 1)
+        result = runStrategy1(symbol, lower_timeframe, higher_timeframe, true, ENV_BUY);
+        if (result == STRATEGY_STATUS_IMMEDIATE_BUY)
         {
-          group.active_symbol = symbol;
-          OrderDelete(activeTicket, clrAzure);
+          group.active_symbol_buy = symbol;
+          OrderDelete(activeTicketBuy, clrAzure);
+        }
+      }
+
+      canReplaceExistingPendingInCurrentGroup = PrioritizeSameGroup && group.active_symbol_sell != symbol && group.active_symbol_sell != "" && isActiveSymPendingSell && result == STRATEGY_STATUS_IMMEDIATE_SELL;
+      if (canReplaceExistingPendingInCurrentGroup)
+      {
+        result = runStrategy1(symbol, lower_timeframe, higher_timeframe, true, ENV_SELL);
+        if (result == STRATEGY_STATUS_IMMEDIATE_SELL)
+        {
+          group.active_symbol_sell = symbol;
+          OrderDelete(activeTicketSell, clrAzure);
         }
       }
     }
@@ -290,13 +369,15 @@ void scanSymbolGroups()
 
   Comment(
       "Current Session: " + IntegerToString(getSessionNumber(TimeCurrent())),
-      "\nActive Symbols:\n",
-      activeSymbolsList);
+      "\nActive Symbols (BUY):\n",
+      activeSymbolsListBuy,
+      "\nActive Symbols (SELL):\n",
+      activeSymbolsListSell);
 }
 
-int runStrategy1(string symbol, ENUM_TIMEFRAMES lowTF, ENUM_TIMEFRAMES highTF, bool trade = true)
+StrategyStatus runStrategy1(string symbol, ENUM_TIMEFRAMES lowTF, ENUM_TIMEFRAMES highTF, bool trade = true, OrderEnvironment allowedEnv = ENV_BOTH)
 {
-  int result = -1;
+  StrategyStatus result = STRATEGY_STATUS_LOCKED;
   HigherTFCrossCheckResult maCross = findHigherTimeFrameMACross(symbol, highTF);
   if (maCross.found)
   {
@@ -305,11 +386,11 @@ int runStrategy1(string symbol, ENUM_TIMEFRAMES lowTF, ENUM_TIMEFRAMES highTF, b
 
     if (!canCheckSignals)
     {
-      return -1;
+      return STRATEGY_STATUS_LOCKED;
     }
     else
     {
-      result = 0;
+      result = STRATEGY_STATUS_CHECKING_SIGNALS;
     }
 
     bool isTimeAllowed = TimeFilter(SessionStart1, SessionEnd1) || TimeFilter(SessionStart2, SessionEnd2) || TimeFilter(SessionStart3, SessionEnd3);
@@ -356,13 +437,24 @@ int runStrategy1(string symbol, ENUM_TIMEFRAMES lowTF, ENUM_TIMEFRAMES highTF, b
               orderCalculated.pending = false;
             }
 
-            if (trade)
+            if (trade && (allowedEnv == ENV_BOTH || allowedEnv == maCross.orderEnvironment))
             {
               Order(symbol, maCross.orderEnvironment, orderCalculated);
               drawVLine(0, "Order_" + IntegerToString(lastSignal.maChangeShift), clrOrange);
               // breakPoint();
             }
-            return orderCalculated.pending == false ? 1 : 2; // 1 = immediate , 2 = pending
+
+            // Preparing the strategy result
+            if (maCross.orderEnvironment == ENV_SELL)
+            {
+              result = orderCalculated.pending == false ? STRATEGY_STATUS_IMMEDIATE_SELL : STRATEGY_STATUS_PENDING_SELL;
+            }
+            else if (maCross.orderEnvironment == ENV_BUY)
+            {
+              result = orderCalculated.pending == false ? STRATEGY_STATUS_IMMEDIATE_BUY : STRATEGY_STATUS_PENDING_BUY;
+            }
+
+            return result;
           }
         }
       }
@@ -1239,7 +1331,15 @@ void initializeGroups()
         int currentSession = getSessionNumber(TimeCurrent());
         if (sessionsEqual(orderSession, currentSession))
         {
-          group.active_symbol = sym;
+          int OP = OrderType();
+          if (OP == OP_SELL || OP == OP_SELLLIMIT || OP == OP_SELLSTOP)
+          {
+            group.active_symbol_sell = sym;
+          }
+          else if (OP == OP_BUY || OP == OP_BUYLIMIT || OP == OP_BUYSTOP)
+          {
+            group.active_symbol_buy = sym;
+          }
           break;
         }
       }
@@ -1257,7 +1357,15 @@ void initializeGroups()
           bool hadProfit = OrderProfit() >= 0; // OrderClosePrice() >= OrderTakeProfit();
           if (hadProfit)
           {
-            group.active_symbol = sym;
+            int OP = OrderType();
+            if (OP == OP_SELL || OP == OP_SELLLIMIT || OP == OP_SELLSTOP)
+            {
+              group.active_symbol_sell = sym;
+            }
+            else if (OP == OP_BUY || OP == OP_BUYLIMIT || OP == OP_BUYSTOP)
+            {
+              group.active_symbol_buy = sym;
+            }
             break;
           }
         }
