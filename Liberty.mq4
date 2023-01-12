@@ -495,7 +495,7 @@ HigherTFCrossCheckResult findHigherTimeFrameMACross(string symbol, ENUM_TIMEFRAM
     int actualShift = getShift(symbol, higherTF, i);
 
     if (actualShift < 0)
-      Print("Shift Error");
+      debug("Shift Error");
 
     double MA5_current = getMA(symbol, higherTF, 5, actualShift);
     double MA5_prev = getMA(symbol, higherTF, 5, actualShift + 1);
@@ -894,7 +894,7 @@ OrderInfoResult calculeOrderPlace(string symbol, ENUM_TIMEFRAMES tf, OrderEnviro
 
   double averageCandle = averageCandleSize(symbol, tf, signalShift, AverageCandleSizePeriod);
   double scaledCandleSize = averageCandle * AverageCandleSizeRatio;
-  // Print("scaledCandleSize = ", scaledCandleSize * (MathPow(10, _Digits - 1)), "  averageCandle = ", averageCandle * (MathPow(10, _Digits - 1)));
+  // debug("scaledCandleSize = ", scaledCandleSize * (MathPow(10, _Digits - 1)), "  averageCandle = ", averageCandle * (MathPow(10, _Digits - 1)));
 
   // double gapSizeInPoint = pipToPoint(symbol, StoplossGapInPip);
   double gapSizeInPoint = averageCandle * StopLossGapInAverageCandleSize;
@@ -983,7 +983,7 @@ OrderInfoResult validateOrderDistance(string symbol, ENUM_TIMEFRAMES tf, OrderEn
 
       //   SignalResult sg = signals[signalIndexToValidate];
       //   drawHLine(mostValidEntry.orderPrice, "orderPrice" + IntegerToString(sg.maChangeShift), C'226,195,43');
-      //   Print("Order Price = ", indexOrderInfo.orderPrice, " mostTP = ", mostValidEntry.tpPrice, " isValidPriceDistance = ", isValidPriceDistance);
+      //   debug("Order Price = ", indexOrderInfo.orderPrice, " mostTP = ", mostValidEntry.tpPrice, " isValidPriceDistance = ", isValidPriceDistance);
       // }
 
       // If it is in a valid distance to first entry we will consider that entry as a pending order and replace with current one
@@ -1328,7 +1328,7 @@ void checkForBreakEven(string symbol, int orderIndex)
         clrAqua            // color
     );
 
-    Print("======================== Breakeven applied==========");
+    debug("======================== Breakeven applied==========");
 
     // breakPoint();
   }
@@ -1659,7 +1659,7 @@ void drawArrowObj(int shift, bool up = true, string id = "", double clr = clrAqu
   ObjectSetInteger(0, id2, OBJPROP_WIDTH, 5);
 }
 
-void drawValidationObj(int shift, bool up = true, bool valid = true, string id = "", double clr = C'9,255,9')
+void drawValidationObj(int shift, bool up = true, bool valid = true, string id = "", double clr = C '9,255,9')
 {
   datetime time = iTime(_Symbol, PERIOD_CURRENT, shift);
   double price = up ? iLow(_Symbol, PERIOD_CURRENT, shift) : iHigh(_Symbol, PERIOD_CURRENT, shift);
@@ -1708,18 +1708,18 @@ void simulate(string symbol, ENUM_TIMEFRAMES tf, HigherTFCrossCheckResult &maCro
 
     OrderInfoResult orderCalculated;
 
-    double hsColor = C'60,167,17';
-    double lsColor = C'249,0,0';
+    double hsColor = C '60,167,17';
+    double lsColor = C '249,0,0';
     double orderColor = clrAqua;
-    double depthOfMoveColor = C'207,0,249';
+    double depthOfMoveColor = C '207,0,249';
 
     const int active = ActiveSignalForTest;
 
     if (i == active)
     {
-      lsColor = C'255,230,6';
+      lsColor = C '255,230,6';
       orderColor = clrGreen;
-      depthOfMoveColor = C'249,0,0';
+      depthOfMoveColor = C '249,0,0';
       drawVLine(item.maChangeShift, IntegerToString(item.maChangeShift) + "test", orderColor);
     }
 
@@ -1746,14 +1746,14 @@ void simulate(string symbol, ENUM_TIMEFRAMES tf, HigherTFCrossCheckResult &maCro
 
     orderCalculated = validateOrderDistance(_Symbol, PERIOD_CURRENT, maCross.orderEnvironment, signals, i);
 
-    drawValidationObj(item.maChangeShift, maCross.orderEnvironment == ENV_BUY, orderCalculated.valid, IntegerToString(item.maChangeShift), orderCalculated.valid ? C'9,255,9' : C'249,92,92');
+    drawValidationObj(item.maChangeShift, maCross.orderEnvironment == ENV_BUY, orderCalculated.valid, IntegerToString(item.maChangeShift), orderCalculated.valid ? C '9,255,9' : C '249,92,92');
 
     if (i == active)
     {
       string id = IntegerToString(i);
-      drawHLine(orderCalculated.orderPrice, "_order_" + id, orderCalculated.pending ? C'245,46,219' : C'0,191,73');
-      drawHLine(orderCalculated.slPrice, "_sl_" + id, C'255,5,5');
-      drawHLine(orderCalculated.tpPrice, "_tp_" + id, C'0,119,255');
+      drawHLine(orderCalculated.orderPrice, "_order_" + id, orderCalculated.pending ? C '245,46,219' : C '0,191,73');
+      drawHLine(orderCalculated.slPrice, "_sl_" + id, C '255,5,5');
+      drawHLine(orderCalculated.tpPrice, "_tp_" + id, C '0,119,255');
     }
   }
 }
