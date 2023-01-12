@@ -1177,38 +1177,29 @@ bool processOrders(string symbol, datetime crossTime)
     // FileWrite(handle, OrderTicket(), OrderOpenPrice(), OrderOpenTime(), OrderSymbol(), OrderLots());
   }
 
-  int lastHistoryOrderTicket = selectLastHistoryOrderTicketFor(symbol);
-
-  if (lastHistoryOrderTicket > -1 && OrderSelect(lastHistoryOrderTicket, SELECT_BY_TICKET, MODE_HISTORY) == true)
+  if (symbolHasRecentProfit(symbol))
   {
-    if (symbol == OrderSymbol() && OrderMagicNumber() == MagicNumber)
+    if (SingleChart)
     {
-      bool hadProfit = OrderProfit() >= 0; // OrderClosePrice() >= OrderTakeProfit();
-      if (hadProfit)
+      // Dar halate single chart sessione jadid baraye symbole profit dar
+      // bar asase crossinge jadid khahad bud
+      int orderTime = (int)OrderOpenTime();
+      int cross_Time = (int)crossTime;
+      // Already made profit in the current crossing session
+      if (orderTime > cross_Time)
       {
-        if (SingleChart)
-        {
-          // Dar halate single chart sessione jadid baraye symbole profit dar
-          // bar asase crossinge jadid khahad bud
-          int orderTime = (int)OrderOpenTime();
-          int cross_Time = (int)crossTime;
-          // Already made profit in the current crossing session
-          if (orderTime > cross_Time)
-          {
-            return false;
-          }
-        }
-        else
-        {
-          int orderSession = getSessionNumber(OrderOpenTime());
-          int currentSession = getSessionNumber(TimeCurrent());
-          // Agar single chart nabud sessione jadid baraye symbole profit dar
-          // Zamani ast ke sessione trade ba sessione alan barabar nabashad
-          if (sessionsEqual(orderSession, currentSession))
-          {
-            return false;
-          }
-        }
+        return false;
+      }
+    }
+    else
+    {
+      int orderSession = getSessionNumber(OrderOpenTime());
+      int currentSession = getSessionNumber(TimeCurrent());
+      // Agar single chart nabud sessione jadid baraye symbole profit dar
+      // Zamani ast ke sessione trade ba sessione alan barabar nabashad
+      if (sessionsEqual(orderSession, currentSession))
+      {
+        return false;
       }
     }
   }
