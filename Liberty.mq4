@@ -1394,7 +1394,7 @@ void checkForBreakEven(string symbol, int orderIndex)
         clrAqua            // color
     );
 
-    debug("======================== Breakeven applied==========");
+    debug("============ Breakeven applied(" + symbol + ") ============");
 
     // breakPoint();
   }
