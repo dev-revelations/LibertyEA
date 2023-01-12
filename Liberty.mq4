@@ -1053,6 +1053,8 @@ int getShift(string symbol, ENUM_TIMEFRAMES timeframe, int shift)
   return actualShift;
 }
 
+/////////////////////////// Order Helpers ///////////////////////////
+
 double pipToPoint(string symbol, double pipValue)
 {
   double digits = MarketInfo(symbol, MODE_DIGITS);
@@ -1214,6 +1216,7 @@ bool processOrders(string symbol, datetime crossTime)
   return true;
 }
 
+/////////////////////////// Order Management Helpers ///////////////////////////
 void processEAOrders()
 {
 
@@ -1221,6 +1224,9 @@ void processEAOrders()
   for (int pos = 0; pos < total; pos++)
   {
     if (OrderSelect(pos, SELECT_BY_POS) == false)
+      continue;
+
+    if (deletePendingIfExceededTPThreshold())
       continue;
 
     if (EnableBreakEven)
@@ -1419,6 +1425,48 @@ bool isOpPending(int op)
   return op == OP_SELLLIMIT || op == OP_BUYLIMIT || op == OP_SELLSTOP || op == OP_BUYSTOP;
 }
 
+bool deletePendingIfExceededTPThreshold()
+{
+  string symbol = OrderSymbol();
+  int OP = OrderType();
+  double TP = OrderTakeProfit();
+  double ask = MarketInfo(symbol, MODE_ASK);
+
+  bool typeSell = OP == OP_SELLLIMIT || OP == OP_SELLSTOP;
+  bool typeBuy = OP == OP_BUYLIMIT || OP == OP_BUYSTOP;
+
+  bool shouldDelete = false;
+
+  if (typeSell)
+  {
+    shouldDelete = ask <= TP;
+  }
+  else if (typeBuy)
+  {
+    shouldDelete = ask >= TP;
+  }
+
+  bool couldDelete = false;
+
+  if (shouldDelete)
+  {
+    couldDelete = OrderDelete(OrderTicket(), clrAzure);
+    if (couldDelete)
+    {
+      Alert("Pending Exceeded TP Threshold: Deleted Pending For " + symbol);
+      Print("Pending Exceeded TP Threshold: Deleted Pending For " + symbol);
+    }
+    else
+    {
+      Alert("Pending Exceeded TP Threshold: Could not delete pending for " + symbol);
+      Print("Pending Exceeded TP Threshold: Could not delete pending for " + symbol);
+    }
+  }
+
+  return couldDelete;
+}
+
+/////////////////////////// Time & Session Helpers ///////////////////////////
 bool TimeFilter(int start_time, int end_time)
 {
   int CurrentHour = TimeHour(TimeCurrent());
@@ -1613,7 +1661,7 @@ void drawArrowObj(int shift, bool up = true, string id = "", double clr = clrAqu
   ObjectSetInteger(0, id2, OBJPROP_WIDTH, 5);
 }
 
-void drawValidationObj(int shift, bool up = true, bool valid = true, string id = "", double clr = C '9,255,9')
+void drawValidationObj(int shift, bool up = true, bool valid = true, string id = "", double clr = C'9,255,9')
 {
   datetime time = iTime(_Symbol, PERIOD_CURRENT, shift);
   double price = up ? iLow(_Symbol, PERIOD_CURRENT, shift) : iHigh(_Symbol, PERIOD_CURRENT, shift);
@@ -1662,18 +1710,18 @@ void simulate(string symbol, ENUM_TIMEFRAMES tf, HigherTFCrossCheckResult &maCro
 
     OrderInfoResult orderCalculated;
 
-    double hsColor = C '60,167,17';
-    double lsColor = C '249,0,0';
+    double hsColor = C'60,167,17';
+    double lsColor = C'249,0,0';
     double orderColor = clrAqua;
-    double depthOfMoveColor = C '207,0,249';
+    double depthOfMoveColor = C'207,0,249';
 
     const int active = ActiveSignalForTest;
 
     if (i == active)
     {
-      lsColor = C '255,230,6';
+      lsColor = C'255,230,6';
       orderColor = clrGreen;
-      depthOfMoveColor = C '249,0,0';
+      depthOfMoveColor = C'249,0,0';
       drawVLine(item.maChangeShift, IntegerToString(item.maChangeShift) + "test", orderColor);
     }
 
@@ -1700,14 +1748,14 @@ void simulate(string symbol, ENUM_TIMEFRAMES tf, HigherTFCrossCheckResult &maCro
 
     orderCalculated = validateOrderDistance(_Symbol, PERIOD_CURRENT, maCross.orderEnvironment, signals, i);
 
-    drawValidationObj(item.maChangeShift, maCross.orderEnvironment == ENV_BUY, orderCalculated.valid, IntegerToString(item.maChangeShift), orderCalculated.valid ? C '9,255,9' : C '249,92,92');
+    drawValidationObj(item.maChangeShift, maCross.orderEnvironment == ENV_BUY, orderCalculated.valid, IntegerToString(item.maChangeShift), orderCalculated.valid ? C'9,255,9' : C'249,92,92');
 
     if (i == active)
     {
       string id = IntegerToString(i);
-      drawHLine(orderCalculated.orderPrice, "_order_" + id, orderCalculated.pending ? C '245,46,219' : C '0,191,73');
-      drawHLine(orderCalculated.slPrice, "_sl_" + id, C '255,5,5');
-      drawHLine(orderCalculated.tpPrice, "_tp_" + id, C '0,119,255');
+      drawHLine(orderCalculated.orderPrice, "_order_" + id, orderCalculated.pending ? C'245,46,219' : C'0,191,73');
+      drawHLine(orderCalculated.slPrice, "_sl_" + id, C'255,5,5');
+      drawHLine(orderCalculated.tpPrice, "_tp_" + id, C'0,119,255');
     }
   }
 }
