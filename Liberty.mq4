@@ -52,7 +52,9 @@ extern string CustomGroup1 = "GER30 F40 UK100 US30 US2000 US500";
 extern string CustomGroup2 = "USOIL";
 extern string _separator5 = "======================================="; // ===== Test & Simulation =====
 extern bool EnableSimulation = false;
+extern bool ClearObjects = false; // Clear Objects If Simulation Is Off
 extern int ActiveSignalForTest = 0;
+extern bool ShowTP_SL = false; // Show TP & SL Lines
 
 /////////////////////////////////// Symbol Groups Data Structures///////////////////////////////////////////
 
@@ -332,6 +334,9 @@ void scanSymbolGroups()
       }
 
       RefreshRates();
+
+      simulate(symbol, lower_timeframe);
+
       StrategyStatus result = runStrategy1(symbol, lower_timeframe, higher_timeframe, availableEnvInGroup != ENV_NONE, availableEnvInGroup);
 
       // If for any reason the strategy is locked for the current symbol then we will ignore it
@@ -442,12 +447,6 @@ StrategyStatus runStrategy1(string symbol, ENUM_TIMEFRAMES lowTF, ENUM_TIMEFRAME
         SignalResult signals[];
         listSignals(signals, symbol, lowTF, maCross.orderEnvironment, firstAreaTouchShift);
 
-        if (EnableSimulation)
-        {
-          simulate(symbol, lowTF, maCross, firstAreaTouchShift, signals);
-          drawVLine(maCross.crossCandleShift, "Order_" + IntegerToString(maCross.crossCandleShift), clrBlanchedAlmond);
-        }
-
         int signalsCount = ArraySize(signals);
         if (signalsCount > 0)
         {
@@ -477,7 +476,8 @@ StrategyStatus runStrategy1(string symbol, ENUM_TIMEFRAMES lowTF, ENUM_TIMEFRAME
             if (trade && (allowedEnv == ENV_BOTH || allowedEnv == maCross.orderEnvironment))
             {
               Order(symbol, maCross.orderEnvironment, orderCalculated);
-              drawVLine(0, "Order_" + IntegerToString(lastSignal.maChangeShift), clrOrange);
+              long chartId = findSymbolChart(symbol);
+              drawVLine(chartId, 0, "Order_" + IntegerToString(lastSignal.maChangeShift), clrOrange);
               // breakPoint();
             }
 
@@ -1726,69 +1726,88 @@ void drawCross(datetime time, double price)
   //  }
 }
 
-void drawVLine(int shift, string id = "", double clr = clrAqua)
+void drawVLine(long chartId, int shift, string id = "", int clr = clrAqua)
 {
-  datetime time = iTime(_Symbol, PERIOD_CURRENT, shift);
-  double price = iOpen(_Symbol, PERIOD_CURRENT, shift);
+  string symbol = ChartSymbol(chartId);
+  datetime time = iTime(symbol, PERIOD_CURRENT, shift);
+  double price = iOpen(symbol, PERIOD_CURRENT, shift);
 
-  string id2 = "liberty_v_" + id;
+  string id2 = "liberty_v_" + IntegerToString(chartId) + "_" + id;
 
   // ObjectDelete(id2);
-  ObjectCreate(id2, OBJ_VLINE, 0, time, price);
-  ObjectSet(id2, OBJPROP_COLOR, clr);
+  ObjectCreate(chartId, id2, OBJ_VLINE, 0, time, price);
+  ObjectSetInteger(chartId, id2, OBJPROP_COLOR, clr);
 }
 
-void drawHLine(double price, string id = "", double clr = clrAqua)
+void drawHLine(long chartId, double price, string id = "", int clr = clrAqua)
 {
-  datetime time = iTime(_Symbol, PERIOD_CURRENT, 0);
+  string symbol = ChartSymbol(chartId);
+  datetime time = iTime(symbol, PERIOD_CURRENT, 0);
 
-  string id2 = "liberty_h_" + id;
+  string id2 = "liberty_h_" + IntegerToString(chartId) + "_" + id;
 
   // ObjectDelete(id2);
-  ObjectCreate(id2, OBJ_HLINE, 0, time, price);
-  ObjectSet(id2, OBJPROP_COLOR, clr);
+  ObjectCreate(chartId, id2, OBJ_HLINE, 0, time, price);
+  ObjectSetInteger(chartId, id2, OBJPROP_COLOR, clr);
 }
 
-void drawArrowObj(int shift, bool up = true, string id = "", double clr = clrAqua)
+void drawArrowObj(long chartId, int shift, bool up = true, string id = "", int clr = clrAqua)
 {
-  datetime time = iTime(_Symbol, PERIOD_CURRENT, shift);
-  double price = up ? iLow(_Symbol, PERIOD_CURRENT, shift) : iHigh(_Symbol, PERIOD_CURRENT, shift);
+  string symbol = ChartSymbol(chartId);
+  datetime time = iTime(symbol, PERIOD_CURRENT, shift);
+  double price = up ? iLow(symbol, PERIOD_CURRENT, shift) : iHigh(symbol, PERIOD_CURRENT, shift);
   const double increment = Point() * 100;
   price = up ? price - increment : price + increment;
   int obj = up ? OBJ_ARROW_UP : OBJ_ARROW_DOWN;
 
-  string id2 = "liberty_arrow_" + id;
+  string id2 = "liberty_arrow_" + IntegerToString(chartId) + "_" + id;
 
   // ObjectDelete(id2);
-  ObjectCreate(id2, obj, 0, time, price);
-  ObjectSet(id2, OBJPROP_COLOR, clr);
-  ObjectSetInteger(0, id2, OBJPROP_WIDTH, 5);
+  ObjectCreate(chartId, id2, obj, 0, time, price);
+  ObjectSetInteger(chartId, id2, OBJPROP_COLOR, clr);
+  ObjectSetInteger(chartId, id2, OBJPROP_WIDTH, 5);
 }
 
-void drawValidationObj(int shift, bool up = true, bool valid = true, string id = "", double clr = C'9,255,9')
+void drawValidationObj(long chartId, int shift, bool up = true, bool valid = true, string id = "", int clr = C'9,255,9')
 {
-  datetime time = iTime(_Symbol, PERIOD_CURRENT, shift);
-  double price = up ? iLow(_Symbol, PERIOD_CURRENT, shift) : iHigh(_Symbol, PERIOD_CURRENT, shift);
+  string symbol = ChartSymbol(chartId);
+  datetime time = iTime(symbol, PERIOD_CURRENT, shift);
+  double price = up ? iLow(symbol, PERIOD_CURRENT, shift) : iHigh(symbol, PERIOD_CURRENT, shift);
   const double increment = Point() * 200;
   price = up ? price - increment : price + increment;
   int obj = valid ? OBJ_ARROW_CHECK : OBJ_ARROW_STOP;
 
-  string id2 = "liberty_validation_" + id;
+  string id2 = "liberty_validation_" + IntegerToString(chartId) + "_" + id;
 
   // ObjectDelete(id2);
-  ObjectCreate(id2, obj, 0, time, price);
-  ObjectSet(id2, OBJPROP_COLOR, clr);
-  ObjectSetInteger(0, id2, OBJPROP_WIDTH, 5);
+  ObjectCreate(chartId, id2, obj, 0, time, price);
+  ObjectSetInteger(chartId, id2, OBJPROP_COLOR, clr);
+  ObjectSetInteger(chartId, id2, OBJPROP_WIDTH, 5);
 }
 
+long findSymbolChart(string symbol)
+{
+  long chartId = ChartFirst();
+
+  while (chartId > 0)
+  {
+    if (ChartSymbol(chartId) == symbol)
+    {
+      return chartId;
+    }
+    chartId = ChartNext(chartId);
+  }
+
+  return -1;
+}
 //+------------------------------------------------------------------+
 
-void deleteObjectsAll()
+void deleteObjectsAll(long chartId)
 {
-  ObjectsDeleteAll(0, "liberty_arrow_");
-  ObjectsDeleteAll(0, "liberty_v_");
-  ObjectsDeleteAll(0, "liberty_h_");
-  ObjectsDeleteAll(0, "liberty_validation_");
+  ObjectsDeleteAll(chartId, "liberty_arrow_", 0);
+  ObjectsDeleteAll(chartId, "liberty_v_", 0);
+  ObjectsDeleteAll(chartId, "liberty_h_", 0);
+  ObjectsDeleteAll(chartId, "liberty_validation_", 0);
   // ObjectsDeleteAll(0, OBJ_ARROW_DOWN);
 }
 //+------------------------------------------------------------------+
@@ -1804,63 +1823,97 @@ void breakPoint()
   }
 }
 
-void simulate(string symbol, ENUM_TIMEFRAMES tf, HigherTFCrossCheckResult &maCross, int firstAreaTouchShift, SignalResult &signals[])
+void simulate(string symbol, ENUM_TIMEFRAMES low_tf)
 {
-  deleteObjectsAll();
-  int listSize = ArraySize(signals);
-  for (int i = 0; i < listSize; i++)
+  if (EnableSimulation)
   {
-    SignalResult item = signals[i];
 
-    OrderInfoResult orderCalculated;
-
-    double hsColor = C'60,167,17';
-    double lsColor = C'249,0,0';
-    double orderColor = clrAqua;
-    double depthOfMoveColor = C'207,0,249';
-
-    const int active = ActiveSignalForTest;
-
-    if (i == active)
+    if (symbol != "")
     {
-      lsColor = C'255,230,6';
-      orderColor = clrGreen;
-      depthOfMoveColor = C'249,0,0';
-      drawVLine(item.maChangeShift, IntegerToString(item.maChangeShift) + "test", orderColor);
+      long chartId = findSymbolChart(symbol);
+      if (chartId > 0)
+      {
+
+        HigherTFCrossCheckResult maCross = findHigherTimeFrameMACross(symbol, higher_timeframe);
+        if (maCross.found)
+        {
+
+          int firstAreaTouchShift = findAreaTouch(symbol, higher_timeframe, maCross.orderEnvironment, maCross.crossCandleShift, PERIOD_CURRENT);
+
+          if (firstAreaTouchShift > 0 && maCross.orderEnvironment != ENV_NONE)
+          {
+
+            SignalResult signals[];
+            listSignals(signals, symbol, low_tf, maCross.orderEnvironment, firstAreaTouchShift);
+
+            deleteObjectsAll(chartId);
+
+            drawVLine(chartId, maCross.crossCandleShift, "Order_" + IntegerToString(maCross.crossCandleShift), clrBlanchedAlmond);
+
+            int listSize = ArraySize(signals);
+            for (int i = 0; i < listSize; i++)
+            {
+              SignalResult item = signals[i];
+
+              OrderInfoResult orderCalculated;
+
+              double hsColor = C'60,167,17';
+              double lsColor = C'249,0,0';
+              int orderColor = clrAqua;
+              double depthOfMoveColor = C'207,0,249';
+
+              const int active = ActiveSignalForTest;
+
+              if (i == active)
+              {
+                lsColor = C'255,230,6';
+                orderColor = clrGreen;
+                depthOfMoveColor = C'249,0,0';
+                drawVLine(chartId, item.maChangeShift, IntegerToString(item.maChangeShift) + "test", orderColor);
+              }
+
+              // drawVLine(item.moveDepthShift, IntegerToString(item.moveDepthShift), depthOfMoveColor);
+
+              if (maCross.orderEnvironment == ENV_SELL && item.highestShift > -1)
+              {
+                // drawArrowObj(item.highestShift, false, IntegerToString(item.highestShift), hsColor);
+
+                double virtualPrice = iLow(symbol, low_tf, item.maChangeShift);
+                orderCalculated = calculeOrderPlace(symbol, low_tf, maCross.orderEnvironment, item.maChangeShift, item.highestShift, virtualPrice);
+              }
+              else if (maCross.orderEnvironment == ENV_BUY && item.lowestShift > -1)
+              {
+                // drawArrowObj(item.lowestShift, true, IntegerToString(item.lowestShift), lsColor);
+
+                double virtualPrice = iHigh(symbol, low_tf, item.maChangeShift);
+                orderCalculated = calculeOrderPlace(symbol, low_tf, maCross.orderEnvironment, item.maChangeShift, item.lowestShift, virtualPrice);
+              }
+
+              drawArrowObj(chartId, item.maChangeShift, maCross.orderEnvironment == ENV_BUY, IntegerToString(item.maChangeShift), orderColor);
+
+              // drawVLine(item.lowestShift, IntegerToString(item.lowestShift), C'207,249,0');
+
+              orderCalculated = validateOrderDistance(symbol, low_tf, maCross.orderEnvironment, signals, i);
+
+              drawValidationObj(chartId, item.maChangeShift, maCross.orderEnvironment == ENV_BUY, orderCalculated.valid, IntegerToString(item.maChangeShift), orderCalculated.valid ? C'9,255,9' : C'249,92,92');
+
+              if (i == active && ShowTP_SL)
+              {
+                string id = IntegerToString(i);
+                drawHLine(chartId, orderCalculated.orderPrice, "_order_" + id, orderCalculated.pending ? C'245,46,219' : C'0,191,73');
+                drawHLine(chartId, orderCalculated.slPrice, "_sl_" + id, C'255,5,5');
+                drawHLine(chartId, orderCalculated.tpPrice, "_tp_" + id, C'0,119,255');
+              }
+            }
+          }
+        }
+      }
     }
-
-    // drawVLine(item.moveDepthShift, IntegerToString(item.moveDepthShift), depthOfMoveColor);
-
-    if (maCross.orderEnvironment == ENV_SELL && item.highestShift > -1)
-    {
-      // drawArrowObj(item.highestShift, false, IntegerToString(item.highestShift), hsColor);
-
-      double virtualPrice = iLow(_Symbol, PERIOD_CURRENT, item.maChangeShift);
-      orderCalculated = calculeOrderPlace(_Symbol, PERIOD_CURRENT, maCross.orderEnvironment, item.maChangeShift, item.highestShift, virtualPrice);
-    }
-    else if (maCross.orderEnvironment == ENV_BUY && item.lowestShift > -1)
-    {
-      // drawArrowObj(item.lowestShift, true, IntegerToString(item.lowestShift), lsColor);
-
-      double virtualPrice = iHigh(_Symbol, PERIOD_CURRENT, item.maChangeShift);
-      orderCalculated = calculeOrderPlace(_Symbol, PERIOD_CURRENT, maCross.orderEnvironment, item.maChangeShift, item.lowestShift, virtualPrice);
-    }
-
-    drawArrowObj(item.maChangeShift, maCross.orderEnvironment == ENV_BUY, IntegerToString(item.maChangeShift), orderColor);
-
-    // drawVLine(item.lowestShift, IntegerToString(item.lowestShift), C'207,249,0');
-
-    orderCalculated = validateOrderDistance(_Symbol, PERIOD_CURRENT, maCross.orderEnvironment, signals, i);
-
-    drawValidationObj(item.maChangeShift, maCross.orderEnvironment == ENV_BUY, orderCalculated.valid, IntegerToString(item.maChangeShift), orderCalculated.valid ? C'9,255,9' : C'249,92,92');
-
-    if (i == active)
-    {
-      string id = IntegerToString(i);
-      drawHLine(orderCalculated.orderPrice, "_order_" + id, orderCalculated.pending ? C'245,46,219' : C'0,191,73');
-      drawHLine(orderCalculated.slPrice, "_sl_" + id, C'255,5,5');
-      drawHLine(orderCalculated.tpPrice, "_tp_" + id, C'0,119,255');
-    }
+  }
+  else if (ClearObjects)
+  {
+    long chartId = findSymbolChart(symbol);
+    deleteObjectsAll(chartId);
   }
 }
 
