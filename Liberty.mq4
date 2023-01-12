@@ -48,8 +48,8 @@ extern bool EnableTradingSession3 = false;                               // Enab
 extern int SessionStart3 = 18;                                           // Session Start 3
 extern int SessionEnd3 = 23;                                             // Session End 3
 extern string _separator4_1 = "======================================="; // ===== Custom Groups =====
-extern string CustomGroup1 = "GER30.cash FRA40.cash EU50.cash UK100.cash US30.cash US100.cash US500.cash";
-extern string CustomGroup2 = "USOIL.cash";
+extern string CustomGroup1 = "GER30 F40 UK100 US30 US2000 US500";
+extern string CustomGroup2 = "USOIL";
 extern string _separator5 = "======================================="; // ===== Test & Simulation =====
 extern bool EnableSimulation = false;
 extern int ActiveSignalForTest = 0;
@@ -79,7 +79,8 @@ string GROUPS_STR[] = {
     "USDCAD EURCAD GBPCAD AUDCAD NZDCAD",
     "EURNZD GBPNZD AUDNZD",
     "EURAUD GBPAUD",
-    "EURGBP"};
+    "EURGBP",
+    "XAUUSD"};
 
 const ushort SYMBOL_SEPARATOR = ' ';
 GroupStruct GROUPS[];
@@ -1612,7 +1613,7 @@ void drawArrowObj(int shift, bool up = true, string id = "", double clr = clrAqu
   ObjectSetInteger(0, id2, OBJPROP_WIDTH, 5);
 }
 
-void drawValidationObj(int shift, bool up = true, bool valid = true, string id = "", double clr = C'9,255,9')
+void drawValidationObj(int shift, bool up = true, bool valid = true, string id = "", double clr = C '9,255,9')
 {
   datetime time = iTime(_Symbol, PERIOD_CURRENT, shift);
   double price = up ? iLow(_Symbol, PERIOD_CURRENT, shift) : iHigh(_Symbol, PERIOD_CURRENT, shift);
@@ -1661,18 +1662,18 @@ void simulate(string symbol, ENUM_TIMEFRAMES tf, HigherTFCrossCheckResult &maCro
 
     OrderInfoResult orderCalculated;
 
-    double hsColor = C'60,167,17';
-    double lsColor = C'249,0,0';
+    double hsColor = C '60,167,17';
+    double lsColor = C '249,0,0';
     double orderColor = clrAqua;
-    double depthOfMoveColor = C'207,0,249';
+    double depthOfMoveColor = C '207,0,249';
 
     const int active = ActiveSignalForTest;
 
     if (i == active)
     {
-      lsColor = C'255,230,6';
+      lsColor = C '255,230,6';
       orderColor = clrGreen;
-      depthOfMoveColor = C'249,0,0';
+      depthOfMoveColor = C '249,0,0';
       drawVLine(item.maChangeShift, IntegerToString(item.maChangeShift) + "test", orderColor);
     }
 
@@ -1699,14 +1700,14 @@ void simulate(string symbol, ENUM_TIMEFRAMES tf, HigherTFCrossCheckResult &maCro
 
     orderCalculated = validateOrderDistance(_Symbol, PERIOD_CURRENT, maCross.orderEnvironment, signals, i);
 
-    drawValidationObj(item.maChangeShift, maCross.orderEnvironment == ENV_BUY, orderCalculated.valid, IntegerToString(item.maChangeShift), orderCalculated.valid ? C'9,255,9' : C'249,92,92');
+    drawValidationObj(item.maChangeShift, maCross.orderEnvironment == ENV_BUY, orderCalculated.valid, IntegerToString(item.maChangeShift), orderCalculated.valid ? C '9,255,9' : C '249,92,92');
 
     if (i == active)
     {
       string id = IntegerToString(i);
-      drawHLine(orderCalculated.orderPrice, "_order_" + id, orderCalculated.pending ? C'245,46,219' : C'0,191,73');
-      drawHLine(orderCalculated.slPrice, "_sl_" + id, C'255,5,5');
-      drawHLine(orderCalculated.tpPrice, "_tp_" + id, C'0,119,255');
+      drawHLine(orderCalculated.orderPrice, "_order_" + id, orderCalculated.pending ? C '245,46,219' : C '0,191,73');
+      drawHLine(orderCalculated.slPrice, "_sl_" + id, C '255,5,5');
+      drawHLine(orderCalculated.tpPrice, "_tp_" + id, C '0,119,255');
     }
   }
 }
