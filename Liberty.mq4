@@ -1177,31 +1177,9 @@ bool processOrders(string symbol, datetime crossTime)
     // FileWrite(handle, OrderTicket(), OrderOpenPrice(), OrderOpenTime(), OrderSymbol(), OrderLots());
   }
 
-  if (symbolHasRecentProfit(symbol))
+  if (symbolHasProfitInCurrentCrossing(symbol, (int)crossTime))
   {
-    if (SingleChart)
-    {
-      // Dar halate single chart sessione jadid baraye symbole profit dar
-      // bar asase crossinge jadid khahad bud
-      int orderTime = (int)OrderOpenTime();
-      int cross_Time = (int)crossTime;
-      // Already made profit in the current crossing session
-      if (orderTime > cross_Time)
-      {
-        return false;
-      }
-    }
-    else
-    {
-      int orderSession = getSessionNumber(OrderOpenTime());
-      int currentSession = getSessionNumber(TimeCurrent());
-      // Agar single chart nabud sessione jadid baraye symbole profit dar
-      // Zamani ast ke sessione trade ba sessione alan barabar nabashad
-      if (sessionsEqual(orderSession, currentSession))
-      {
-        return false;
-      }
-    }
+    return false;
   }
 
   return true;
@@ -1257,18 +1235,54 @@ int selectLastHistoryOrderTicketFor(string symbol)
   return lastTicket;
 }
 
-bool symbolHasRecentProfit(string symbol)
+bool symbolHasProfitInCurrentCrossing(string symbol, int crossTime = -1)
 {
   int lastHistoryOrderTicket = selectLastHistoryOrderTicketFor(symbol);
 
-  if (lastHistoryOrderTicket > -1 && OrderSelect(lastHistoryOrderTicket, SELECT_BY_TICKET, MODE_HISTORY) == true)
+  if ((int)crossTime == -1)
   {
-    if (symbol == OrderSymbol() && OrderMagicNumber() == MagicNumber)
+    HigherTFCrossCheckResult maCross = findHigherTimeFrameMACross(symbol, higher_timeframe);
+    if (maCross.found)
     {
-      bool hadProfit = OrderProfit() >= 0; // OrderClosePrice() >= OrderTakeProfit();
-      if (hadProfit)
+      crossTime = (int)maCross.crossTime;
+    }
+  }
+
+  if ((int)crossTime > -1)
+  {
+    if (lastHistoryOrderTicket > -1 && OrderSelect(lastHistoryOrderTicket, SELECT_BY_TICKET, MODE_HISTORY) == true)
+    {
+      if (symbol == OrderSymbol() && OrderMagicNumber() == MagicNumber && !isOpPending(OrderType()))
       {
-        return true;
+        bool hadProfit = OrderProfit() >= 0; // OrderClosePrice() >= OrderTakeProfit();
+        if (hadProfit)
+        {
+          // Sessione jadid baraye symbole profit dar
+          // bar asase crossinge jadid khahad bud
+          int orderTime = (int)OrderOpenTime();
+          int cross_Time = (int)crossTime;
+          // Already made profit in the current crossing session
+
+          bool orderHappenedAfterCrossing = orderTime > cross_Time;
+
+          return orderHappenedAfterCrossing;
+
+          // if (SingleChart)
+          // {
+          //   return orderHappenedAfterCrossing;
+          // }
+          // else
+          // {
+          //   int orderSession = getSessionNumber(OrderOpenTime());
+          //   int currentSession = getSessionNumber(TimeCurrent());
+
+          //   // Agar single chart nabud sessione jadid baraye symbole profit dar
+          //   // Zamani ast ke sessione trade ba sessione alan barabar nabashad
+          //   bool orderHappenedAfterCrossingAndInCurrentSession = orderHappenedAfterCrossing && sessionsEqual(orderSession, currentSession);
+
+          //   return orderHappenedAfterCrossingAndInCurrentSession;
+          // }
+        }
       }
     }
   }
@@ -1348,6 +1362,7 @@ void checkForBreakEven(string symbol, int orderIndex)
 
 void initializeGroups()
 {
+  debug("==========================");
   GROUPS_LENGTH = ArraySize(GROUPS_STR);
 
   if (StringLen(CustomGroup1) > 0)
@@ -1396,40 +1411,37 @@ void initializeGroups()
           {
             group.active_symbol_buy = sym;
           }
+          debug(" Has Open order " + sym);
           break;
         }
       }
 
-      int lastHistoryOrderTicket = selectLastHistoryOrderTicketFor(sym);
-
-      if (lastHistoryOrderTicket > -1 && OrderSelect(lastHistoryOrderTicket, SELECT_BY_TICKET, MODE_HISTORY) == true)
+      if (symbolHasProfitInCurrentCrossing(sym))
       {
         int orderSession = getSessionNumber(OrderOpenTime());
         int currentSession = getSessionNumber(TimeCurrent());
 
-        if (sym == OrderSymbol() && OrderMagicNumber() == MagicNumber && sessionsEqual(orderSession, currentSession))
+        if (sessionsEqual(orderSession, currentSession))
         {
-          // Already made profit in the current crossing session
-          bool hadProfit = OrderProfit() >= 0; // OrderClosePrice() >= OrderTakeProfit();
-          if (hadProfit)
+          int OP = OrderType();
+          if (OP == OP_SELL || OP == OP_SELLLIMIT || OP == OP_SELLSTOP)
           {
-            int OP = OrderType();
-            if (OP == OP_SELL || OP == OP_SELLLIMIT || OP == OP_SELLSTOP)
-            {
-              group.active_symbol_sell = sym;
-            }
-            else if (OP == OP_BUY || OP == OP_BUYLIMIT || OP == OP_BUYSTOP)
-            {
-              group.active_symbol_buy = sym;
-            }
-            break;
+            group.active_symbol_sell = sym;
           }
+          else if (OP == OP_BUY || OP == OP_BUYLIMIT || OP == OP_BUYSTOP)
+          {
+            group.active_symbol_buy = sym;
+          }
+          debug(" Had Profit " + sym);
+          break;
         }
       }
     }
 
     GROUPS[i] = group;
   }
+
+  debug("==========================");
 }
 
 bool isOpPending(int op)
@@ -1482,13 +1494,15 @@ void syncActiveSymbolOrders()
   {
     GroupStruct group = GROUPS[groupIdx];
 
-    if (hasActiveTransaction(group.active_symbol_buy) == false)
+    if (group.active_symbol_buy != "" && hasActiveTransaction(group.active_symbol_buy) == false)
     {
+      debug("Active Symbol Cleard For Expired Pending " + group.active_symbol_buy);
       group.active_symbol_buy = "";
     }
 
-    if (hasActiveTransaction(group.active_symbol_sell) == false)
+    if (group.active_symbol_sell != "" && hasActiveTransaction(group.active_symbol_sell) == false)
     {
+      debug("Active Symbol Cleard For Expired Pending " + group.active_symbol_sell);
       group.active_symbol_sell = "";
     }
 
@@ -1508,7 +1522,7 @@ bool hasActiveTransaction(string symbol)
     }
 
     // Has profit
-    if (symbolHasRecentProfit(symbol))
+    if (symbolHasProfitInCurrentCrossing(symbol))
     {
       return true;
     }
