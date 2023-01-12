@@ -1453,13 +1453,11 @@ bool deletePendingIfExceededTPThreshold()
     couldDelete = OrderDelete(OrderTicket(), clrAzure);
     if (couldDelete)
     {
-      Alert("Pending Exceeded TP Threshold: Deleted Pending For " + symbol);
-      Print("Pending Exceeded TP Threshold: Deleted Pending For " + symbol);
+      debug("Pending Exceeded TP Threshold: Deleted Pending For " + symbol);
     }
     else
     {
-      Alert("Pending Exceeded TP Threshold: Could not delete pending for " + symbol);
-      Print("Pending Exceeded TP Threshold: Could not delete pending for " + symbol);
+      debug("Pending Exceeded TP Threshold: Could not delete pending for " + symbol);
     }
   }
 
@@ -1758,4 +1756,11 @@ void simulate(string symbol, ENUM_TIMEFRAMES tf, HigherTFCrossCheckResult &maCro
       drawHLine(orderCalculated.tpPrice, "_tp_" + id, C'0,119,255');
     }
   }
+}
+
+void debug(string msg)
+{
+  Alert(msg);
+  Print(msg);
+  SendNotification(msg);
 }
