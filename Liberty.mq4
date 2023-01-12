@@ -334,6 +334,13 @@ void scanSymbolGroups()
       RefreshRates();
       StrategyStatus result = runStrategy1(symbol, lower_timeframe, higher_timeframe, availableEnvInGroup != ENV_NONE, availableEnvInGroup);
 
+      // If for any reason the strategy is locked for the current symbol then we will ignore it
+      // In current context it happens when the symbol had profits in pervious sessions and in current crossing
+      if (result == STRATEGY_STATUS_LOCKED && group.active_symbol_buy != symbol && group.active_symbol_sell != symbol)
+      {
+        continue;
+      }
+
       // Agar active symbol ghablan set nashode bud angah symbol ra set mikonim
       // Be in mani ast ke in symbol avalin symboli hast ke signal midahad
       if ((result == STRATEGY_STATUS_IMMEDIATE_BUY || result == STRATEGY_STATUS_PENDING_BUY) && group.active_symbol_buy == "")
@@ -402,13 +409,13 @@ StrategyStatus runStrategy1(string symbol, ENUM_TIMEFRAMES lowTF, ENUM_TIMEFRAME
 
     const bool canCheckSignals = canCheckForSignals(symbol, maCross.crossTime);
 
-    if (!canCheckSignals)
+    if (canCheckSignals)
     {
-      return STRATEGY_STATUS_LOCKED;
+      result = STRATEGY_STATUS_CHECKING_SIGNALS;
     }
     else
     {
-      result = STRATEGY_STATUS_CHECKING_SIGNALS;
+      return STRATEGY_STATUS_LOCKED;
     }
 
     bool isTimeAllowed = TimeFilter(SessionStart1, SessionEnd1) || TimeFilter(SessionStart2, SessionEnd2) || TimeFilter(SessionStart3, SessionEnd3);
