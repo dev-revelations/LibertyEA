@@ -372,8 +372,14 @@ void scanSymbolGroups()
         result = runStrategy1(symbol, lower_timeframe, higher_timeframe, true, ENV_BUY);
         if (result == STRATEGY_STATUS_IMMEDIATE_BUY)
         {
-          group.active_symbol_buy = symbol;
-          OrderDelete(activeTicketBuy, clrAzure);
+          if (OrderDelete(activeTicketBuy, clrAzure))
+          {
+            group.active_symbol_buy = symbol;
+          }
+        }
+        else
+        {
+          // Delete pending
         }
       }
 
@@ -383,8 +389,14 @@ void scanSymbolGroups()
         result = runStrategy1(symbol, lower_timeframe, higher_timeframe, true, ENV_SELL);
         if (result == STRATEGY_STATUS_IMMEDIATE_SELL)
         {
-          group.active_symbol_sell = symbol;
-          OrderDelete(activeTicketSell, clrAzure);
+          if (OrderDelete(activeTicketSell, clrAzure))
+          {
+            group.active_symbol_sell = symbol;
+          }
+        }
+        else
+        {
+          // Delete pending
         }
       }
     }
