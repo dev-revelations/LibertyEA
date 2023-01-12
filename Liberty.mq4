@@ -400,7 +400,7 @@ StrategyStatus runStrategy1(string symbol, ENUM_TIMEFRAMES lowTF, ENUM_TIMEFRAME
   if (maCross.found)
   {
 
-    const bool canCheckSignals = processOrders(symbol, maCross.crossTime);
+    const bool canCheckSignals = canCheckForSignals(symbol, maCross.crossTime);
 
     if (!canCheckSignals)
     {
@@ -1130,7 +1130,7 @@ int Order(string symbol, OrderEnvironment orderEnv, OrderInfoResult &orderInfo, 
       Green);
 }
 
-bool processOrders(string symbol, datetime crossTime)
+bool canCheckForSignals(string symbol, datetime crossTime)
 {
   int total = OrdersTotal();
   for (int pos = 0; pos < total; pos++)
