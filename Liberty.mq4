@@ -1201,6 +1201,8 @@ bool canCheckForSignals(string symbol, datetime crossTime)
           OrderDelete(OrderTicket(), clrAzure);
         }
 
+        debug("Deleting Order Due To Change Of Environment " + symbol);
+
         return true;
       }
 
