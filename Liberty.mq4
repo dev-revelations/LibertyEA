@@ -9,9 +9,10 @@
 #property strict
 
 #include <WinUser32.mqh>
+#include "Liberty.mqh"
 
 extern bool SingleChart = false;                                         // Single Chart Scan
-extern bool PrioritizeSameGroup = true;                                  // Prioritize Same Group Symbols
+// extern bool PrioritizeSameGroup = true;                                  // Prioritize Same Group Symbols
 extern bool EnableEATimer = true;                                        // Enable EA Timer
 extern int EATimerSconds = 1;                                            // EA Timer Interval Seconds
 extern bool CheckSignalsOnNewCandle = true;                              // Check for signals on new candle openning
@@ -58,22 +59,6 @@ extern bool ShowTP_SL = false; // Show TP & SL Lines
 
 /////////////////////////////////// Symbol Groups Data Structures///////////////////////////////////////////
 
-struct GroupStruct
-{
-  string symbols[];
-  string active_symbol_buy;
-  string active_symbol_sell;
-  int symbols_count;
-  int bars[];
-
-  GroupStruct()
-  {
-    active_symbol_buy = "";
-    active_symbol_sell = "";
-    symbols_count = 0;
-  }
-};
-
 string GROUPS_STR[] = {
     "EURUSD GBPUSD AUDUSD NZDUSD",
     "USDCHF GBPCHF CADCHF EURCHF NZDCHF AUDCHF",
@@ -89,106 +74,6 @@ GroupStruct GROUPS[];
 int GROUPS_LENGTH = 0;
 
 //////////////////////////////////////////////////////////////////////////////
-
-enum OrderEnvironment
-{
-  ENV_NONE,
-  ENV_BUY,
-  ENV_SELL,
-  ENV_BOTH
-};
-
-enum MaDirection
-{
-  MA_NONE,
-  MA_UP,
-  MA_DOWN
-};
-
-enum StrategyStatus
-{
-  STRATEGY_STATUS_LOCKED,
-  STRATEGY_STATUS_CHECKING_SIGNALS,
-  STRATEGY_STATUS_IMMEDIATE_BUY,
-  STRATEGY_STATUS_PENDING_BUY,
-  STRATEGY_STATUS_IMMEDIATE_SELL,
-  STRATEGY_STATUS_PENDING_SELL
-};
-
-struct LowMaChangeResult
-{
-  MaDirection dir;
-  int lastChangeShift;
-
-  LowMaChangeResult()
-  {
-  }
-};
-
-struct SignalResult
-{
-  int maChangeShift;  // Noghteye taghir
-  int highestShift;   // Agar sell hast balatarin noghte ghable vorod
-  int lowestShift;    // Agar buy hast payintarin noghte ghable vorod
-  int moveDepthShift; // Cheghadr move zade
-  SignalResult()
-  {
-    maChangeShift = -1;
-    highestShift = -1;
-    lowestShift = -1;
-    moveDepthShift = -1;
-  }
-};
-
-struct HigherTFCrossCheckResult
-{
-  OrderEnvironment orderEnvironment;
-  datetime crossTime;
-  double crossOpenPrice;
-  int crossCandleShift;
-  ENUM_TIMEFRAMES crossCandleShiftTimeframe;
-  bool found;
-  int crossCandleHigherTfShift;
-
-  HigherTFCrossCheckResult()
-  {
-    found = false;
-    crossCandleHigherTfShift = -1;
-  }
-};
-
-struct OrderInfoResult
-{
-  double slPrice;
-  double tpPrice;
-  double orderPrice;        // Final decision
-  double pendingOrderPrice; // Calculated pending price
-  double originalPrice;     // Original price before any decision
-  bool pending;
-  bool valid;
-  OrderInfoResult()
-  {
-    slPrice = -1;
-    tpPrice = -1;
-    orderPrice = -1;
-    pendingOrderPrice = -1;
-    originalPrice = -1;
-    pending = false;
-    valid = false;
-  }
-};
-
-struct StrategyResult
-{
-  StrategyStatus status;
-  OrderInfoResult orderInfo;
-  SignalResult signal;
-
-  StrategyResult()
-  {
-    status = STRATEGY_STATUS_LOCKED;
-  }
-};
 
 //+------------------------------------------------------------------+
 //| Expert initialization function                                   |
@@ -259,8 +144,12 @@ void scanSymbolGroups()
 {
   string activeSymbolsListBuy = "";
   string activeSymbolsListSell = "";
+
   for (int groupIdx = 0; groupIdx < GROUPS_LENGTH; groupIdx++)
   {
+
+    clearOrderPriorityList();
+
     GroupStruct group = GROUPS[groupIdx];
 
     ////////////// Define Available Order Environments For The Group //////////////
@@ -296,7 +185,7 @@ void scanSymbolGroups()
 
     bool isActiveSymPendingSell = true;
     int activeTicketSell = -1;
-    if (PrioritizeSameGroup && group.active_symbol_sell != "")
+    if (/* PrioritizeSameGroup && */ group.active_symbol_sell != "")
     {
       activeTicketSell = selectOpenOrderTicketFor(group.active_symbol_sell);
       if (activeTicketSell > -1)
@@ -308,7 +197,7 @@ void scanSymbolGroups()
 
     bool isActiveSymPendingBuy = true;
     int activeTicketBuy = -1;
-    if (PrioritizeSameGroup && group.active_symbol_buy != "")
+    if (/* PrioritizeSameGroup && */ group.active_symbol_buy != "")
     {
       activeTicketBuy = selectOpenOrderTicketFor(group.active_symbol_buy);
       if (activeTicketBuy > -1)
@@ -343,19 +232,12 @@ void scanSymbolGroups()
         }
       }
 
-      // This will happen only if prioritization is disabled
-      bool shouldIgnoreSym = !PrioritizeSameGroup && availableEnvInGroup == ENV_NONE && group.active_symbol_buy != symbol && group.active_symbol_sell != symbol;
-
-      if (shouldIgnoreSym)
-      {
-        continue;
-      }
 
       RefreshRates();
 
       simulate(symbol, lower_timeframe);
 
-      StrategyResult result = runStrategy1(symbol, lower_timeframe, higher_timeframe, availableEnvInGroup != ENV_NONE, availableEnvInGroup);
+      StrategyResult result = runStrategy1(symbol, lower_timeframe, higher_timeframe, false /* availableEnvInGroup != ENV_NONE */, availableEnvInGroup);
       StrategyStatus status = result.status;
       // If for any reason the strategy is locked for the current symbol then we will ignore it
       // In current context it happens when the symbol had profits in pervious sessions and in current crossing
@@ -364,15 +246,29 @@ void scanSymbolGroups()
         continue;
       }
 
-      // Agar active symbol ghablan set nashode bud angah symbol ra set mikonim
-      // Be in mani ast ke in symbol avalin symboli hast ke signal midahad
-      if ((status == STRATEGY_STATUS_IMMEDIATE_BUY || status == STRATEGY_STATUS_PENDING_BUY) && group.active_symbol_buy == "")
+      /*
+        Agar active symbol ghablan set nashode bud va ya be onvane yek pending set shode bud
+        natijeye be dast amade az barresie strategy ra be onvane natijeye candid jahate
+        olaviat bandi zakhire mikonim ta morede moghayese ba natayeje ehtemalie digar dar
+        gorohe jari gharar begirad
+      */
+      if ((status == STRATEGY_STATUS_IMMEDIATE_BUY || status == STRATEGY_STATUS_PENDING_BUY))
       {
-        group.active_symbol_buy = symbol;
+        if (group.active_symbol_buy == "" || (group.active_symbol_buy != "" && isActiveSymPendingBuy))
+        {
+          // group.active_symbol_buy = symbol;
+          addOrderPriority(result, OP_BUY);
+          debug("Candid added to priority list " + symbol);
+        }
       }
-      else if ((status == STRATEGY_STATUS_IMMEDIATE_SELL || status == STRATEGY_STATUS_PENDING_SELL) && group.active_symbol_sell == "")
+      else if ((status == STRATEGY_STATUS_IMMEDIATE_SELL || status == STRATEGY_STATUS_PENDING_SELL))
       {
-        group.active_symbol_sell = symbol;
+        if (group.active_symbol_sell == "" || (group.active_symbol_sell != "" && isActiveSymPendingSell))
+        {
+          // group.active_symbol_sell = symbol;
+          addOrderPriority(result, OP_SELL);
+          debug("Candid added to priority list " + symbol);
+        }
       }
 
       // Agar symbole jari haman symbole montakhab bud
@@ -387,39 +283,54 @@ void scanSymbolGroups()
       {
         group.active_symbol_sell = "";
       }
+    }
 
-      // Jaygozinie ordere pending ba ordere Immediate
-      bool canReplaceExistingPendingInCurrentGroup = PrioritizeSameGroup && group.active_symbol_buy != symbol && group.active_symbol_buy != "" && isActiveSymPendingBuy && status == STRATEGY_STATUS_IMMEDIATE_BUY;
-      if (canReplaceExistingPendingInCurrentGroup)
+    if (orderPriorityListLength(OP_BUY) > 0)
+    {
+      StrategyResult sr = getPrioritizedOrderStrategyResult(OP_BUY);
+
+      /*  Conditions:
+          1- valid candidate
+          2- Not having current active symbol
+          3- or Having current active symbol which is pending and a candidate which is an immediate order
+       */
+      bool isBuyAllowed = sr.orderInfo.valid && (group.active_symbol_buy == "" || (isActiveSymPendingBuy && !sr.orderInfo.pending));
+      if (isBuyAllowed)
       {
-        result = runStrategy1(symbol, lower_timeframe, higher_timeframe, true, ENV_BUY);
-        if (result.status == STRATEGY_STATUS_IMMEDIATE_BUY)
+        bool canOpen = true;
+        if (activeTicketBuy > -1 && isActiveSymPendingBuy)
         {
-          if (OrderDelete(activeTicketBuy, clrAzure))
-          {
-            group.active_symbol_buy = symbol;
-          }
+          canOpen = OrderDelete(activeTicketBuy, clrAzure);
         }
-        else
+
+        if (canOpen)
         {
-          // Delete pending
+          debug("Prioritized order replacement (" + group.active_symbol_buy + " => " + sr.symbol + ")");
+          group.active_symbol_buy = sr.symbol;
+          Order(sr.symbol, ENV_BUY, sr.orderInfo);
         }
       }
+    }
 
-      canReplaceExistingPendingInCurrentGroup = PrioritizeSameGroup && group.active_symbol_sell != symbol && group.active_symbol_sell != "" && isActiveSymPendingSell && status == STRATEGY_STATUS_IMMEDIATE_SELL;
-      if (canReplaceExistingPendingInCurrentGroup)
+    if (orderPriorityListLength(OP_SELL) > 0)
+    {
+      StrategyResult sr = getPrioritizedOrderStrategyResult(OP_SELL);
+
+      bool isSellAllowed = sr.orderInfo.valid && (group.active_symbol_sell == "" || (isActiveSymPendingSell && !sr.orderInfo.pending));
+      if (isSellAllowed)
       {
-        result = runStrategy1(symbol, lower_timeframe, higher_timeframe, true, ENV_SELL);
-        if (result.status == STRATEGY_STATUS_IMMEDIATE_SELL)
+        bool canOpen = true;
+
+        if (activeTicketSell > -1 && isActiveSymPendingSell)
         {
-          if (OrderDelete(activeTicketSell, clrAzure))
-          {
-            group.active_symbol_sell = symbol;
-          }
+          canOpen = OrderDelete(activeTicketSell, clrAzure);
         }
-        else
+
+        if (canOpen)
         {
-          // Delete pending
+          debug("Prioritized order replacement (" + group.active_symbol_sell + " => " + sr.symbol + ")");
+          group.active_symbol_sell = sr.symbol;
+          Order(sr.symbol, ENV_SELL, sr.orderInfo);
         }
       }
     }
@@ -439,6 +350,7 @@ StrategyResult runStrategy1(string symbol, ENUM_TIMEFRAMES lowTF, ENUM_TIMEFRAME
 {
   StrategyResult result;
   result.status = STRATEGY_STATUS_LOCKED;
+  result.symbol = symbol;
   HigherTFCrossCheckResult maCross = findHigherTimeFrameMACross(symbol, highTF);
   if (maCross.found)
   {
@@ -454,6 +366,8 @@ StrategyResult runStrategy1(string symbol, ENUM_TIMEFRAMES lowTF, ENUM_TIMEFRAME
       result.status = STRATEGY_STATUS_LOCKED;
       return result;
     }
+
+    result.maCross = maCross;
 
     bool isTimeAllowed = TimeFilter(SessionStart1, SessionEnd1) || TimeFilter(SessionStart2, SessionEnd2) || TimeFilter(SessionStart3, SessionEnd3);
 
@@ -943,6 +857,8 @@ OrderInfoResult calculeOrderPlace(string symbol, ENUM_TIMEFRAMES tf, OrderEnviro
 
   orderInfo.originalPrice = price;
 
+  orderInfo.averageCandleSize = averageCandle;
+
   if (orderEnv == ENV_SELL)
   {
     orderInfo.slPrice = highestLowestPrice + gapSizeInPoint;
@@ -1205,7 +1121,7 @@ bool canCheckForSignals(string symbol, HigherTFCrossCheckResult &maCross)
       int cross_Time = (int)maCross.crossTime;
 
       // Environment avaz shode ?
-        int OP = OrderType();
+      int OP = OrderType();
 
       bool orderTypeDifferentThanCrossEnv = maCross.orderEnvironment == ENV_BUY && (OP == OP_SELL || OP == OP_SELLSTOP || OP == OP_SELLLIMIT);
       orderTypeDifferentThanCrossEnv = orderTypeDifferentThanCrossEnv || (maCross.orderEnvironment == ENV_SELL && (OP == OP_BUY || OP == OP_BUYSTOP || OP == OP_BUYLIMIT));
@@ -1237,7 +1153,7 @@ bool canCheckForSignals(string symbol, HigherTFCrossCheckResult &maCross)
       {
         checkForBreakEven(symbol, pos);
       }
-
+      debug("Has Open order " + symbol);
       // Symbol dar liste ordere baz peyda shode, banabarin az checke signale jadid jelogiri mikonim
       return false;
     }
@@ -1246,6 +1162,7 @@ bool canCheckForSignals(string symbol, HigherTFCrossCheckResult &maCross)
 
   if (symbolHasProfitInCurrentCrossing(symbol, (int)maCross.crossTime))
   {
+    debug("Has profit in current crossing " + symbol);
     return false;
   }
 
