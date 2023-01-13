@@ -276,11 +276,15 @@ void scanSymbolGroups()
       if (status == STRATEGY_STATUS_CHECKING_SIGNALS && group.active_symbol_buy == symbol)
       {
         group.active_symbol_buy = "";
+        StrategyResult sr;
+        group.active_strategy_buy = sr;
       }
 
       if (status == STRATEGY_STATUS_CHECKING_SIGNALS && group.active_symbol_sell == symbol)
       {
         group.active_symbol_sell = "";
+        StrategyResult sr;
+        group.active_strategy_sell = sr;
       }
     }
 
@@ -1400,10 +1404,16 @@ void initializeGroups()
           if (OP == OP_SELL || OP == OP_SELLLIMIT || OP == OP_SELLSTOP)
           {
             group.active_symbol_sell = sym;
+            StrategyResult sr;
+            sr.symbol = sym;
+            group.active_strategy_sell = sr;
           }
           else if (OP == OP_BUY || OP == OP_BUYLIMIT || OP == OP_BUYSTOP)
           {
             group.active_symbol_buy = sym;
+            StrategyResult sr;
+            sr.symbol = sym;
+            group.active_strategy_buy = sr;
           }
           debug(" Has Open order " + sym);
           break;
@@ -1492,12 +1502,16 @@ void syncActiveSymbolOrders()
     {
       debug("Active Symbol Cleard For Expired Pending " + group.active_symbol_buy);
       group.active_symbol_buy = "";
+      StrategyResult sr;
+      group.active_strategy_buy = sr;
     }
 
     if (group.active_symbol_sell != "" && hasActiveTransaction(group.active_symbol_sell) == false)
     {
       debug("Active Symbol Cleard For Expired Pending " + group.active_symbol_sell);
       group.active_symbol_sell = "";
+      StrategyResult sr;
+      group.active_strategy_sell = sr;
     }
 
     GROUPS[groupIdx] = group;
