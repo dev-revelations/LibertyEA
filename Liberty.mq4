@@ -11,7 +11,7 @@
 #include <WinUser32.mqh>
 #include "Liberty.mqh"
 
-extern bool SingleChart = false;                                         // Single Chart Scan
+extern bool SingleChart = false; // Single Chart Scan
 // extern bool PrioritizeSameGroup = true;                                  // Prioritize Same Group Symbols
 extern bool EnableEATimer = true;                                        // Enable EA Timer
 extern int EATimerSconds = 1;                                            // EA Timer Interval Seconds
@@ -232,7 +232,6 @@ void scanSymbolGroups()
         }
       }
 
-
       RefreshRates();
 
       simulate(symbol, lower_timeframe);
@@ -285,16 +284,25 @@ void scanSymbolGroups()
       }
     }
 
+    ////////////// Checking for prioritized candidate order //////////////
+
+    if (group.active_strategy_buy.symbol != "")
+      addOrderPriority(group.active_strategy_buy, OP_BUY);
+
+    if (group.active_strategy_sell.symbol != "")
+      addOrderPriority(group.active_strategy_sell, OP_SELL);
+
     if (orderPriorityListLength(OP_BUY) > 0)
     {
       StrategyResult sr = getPrioritizedOrderStrategyResult(OP_BUY);
 
       /*  Conditions:
           1- valid candidate
-          2- Not having current active symbol
-          3- or Having current active symbol which is pending and a candidate which is an immediate order
+          2- candidate should be different than current active symbol
+          3- Not having current active symbol
+          4- or Having current active symbol which is pending and a candidate which is an immediate order
        */
-      bool isBuyAllowed = sr.orderInfo.valid && (group.active_symbol_buy == "" || (isActiveSymPendingBuy && !sr.orderInfo.pending));
+      bool isBuyAllowed = sr.orderInfo.valid && sr.symbol != group.active_symbol_buy && (group.active_symbol_buy == "" || (isActiveSymPendingBuy && !sr.orderInfo.pending));
       if (isBuyAllowed)
       {
         bool canOpen = true;
@@ -307,6 +315,7 @@ void scanSymbolGroups()
         {
           debug("Prioritized order replacement (" + group.active_symbol_buy + " => " + sr.symbol + ")");
           group.active_symbol_buy = sr.symbol;
+          group.active_strategy_buy = sr;
           Order(sr.symbol, ENV_BUY, sr.orderInfo);
         }
       }
@@ -316,7 +325,7 @@ void scanSymbolGroups()
     {
       StrategyResult sr = getPrioritizedOrderStrategyResult(OP_SELL);
 
-      bool isSellAllowed = sr.orderInfo.valid && (group.active_symbol_sell == "" || (isActiveSymPendingSell && !sr.orderInfo.pending));
+      bool isSellAllowed = sr.orderInfo.valid && sr.symbol != group.active_symbol_sell && (group.active_symbol_sell == "" || (isActiveSymPendingSell && !sr.orderInfo.pending));
       if (isSellAllowed)
       {
         bool canOpen = true;
@@ -330,6 +339,7 @@ void scanSymbolGroups()
         {
           debug("Prioritized order replacement (" + group.active_symbol_sell + " => " + sr.symbol + ")");
           group.active_symbol_sell = sr.symbol;
+          group.active_strategy_sell = sr;
           Order(sr.symbol, ENV_SELL, sr.orderInfo);
         }
       }
@@ -1153,7 +1163,7 @@ bool canCheckForSignals(string symbol, HigherTFCrossCheckResult &maCross)
       {
         checkForBreakEven(symbol, pos);
       }
-      debug("Has Open order " + symbol);
+      // debug("Has Open order " + symbol);
       // Symbol dar liste ordere baz peyda shode, banabarin az checke signale jadid jelogiri mikonim
       return false;
     }
@@ -1162,7 +1172,7 @@ bool canCheckForSignals(string symbol, HigherTFCrossCheckResult &maCross)
 
   if (symbolHasProfitInCurrentCrossing(symbol, (int)maCross.crossTime))
   {
-    debug("Has profit in current crossing " + symbol);
+    // debug("Has profit in current crossing " + symbol);
     return false;
   }
 

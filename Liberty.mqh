@@ -110,6 +110,8 @@ struct GroupStruct
     string active_symbol_sell;
     int symbols_count;
     int bars[];
+    StrategyResult active_strategy_buy;
+    StrategyResult active_strategy_sell;
 
     GroupStruct()
     {
