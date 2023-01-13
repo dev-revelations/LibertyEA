@@ -443,7 +443,7 @@ StrategyResult runStrategy1(string symbol, ENUM_TIMEFRAMES lowTF, ENUM_TIMEFRAME
   if (maCross.found)
   {
 
-    const bool canCheckSignals = canCheckForSignals(symbol, maCross.crossTime);
+    const bool canCheckSignals = canCheckForSignals(symbol, maCross);
 
     if (canCheckSignals)
     {
@@ -1191,7 +1191,7 @@ int Order(string symbol, OrderEnvironment orderEnv, OrderInfoResult &orderInfo, 
       Green);
 }
 
-bool canCheckForSignals(string symbol, datetime crossTime)
+bool canCheckForSignals(string symbol, HigherTFCrossCheckResult &maCross)
 {
   int total = OrdersTotal();
   for (int pos = 0; pos < total; pos++)
@@ -1202,12 +1202,16 @@ bool canCheckForSignals(string symbol, datetime crossTime)
     if (symbol == OrderSymbol() && OrderMagicNumber() == MagicNumber)
     {
       int orderTime = (int)OrderOpenTime();
-      int cross_Time = (int)crossTime;
+      int cross_Time = (int)maCross.crossTime;
 
       // Environment avaz shode ?
-      if (orderTime < cross_Time)
-      {
         int OP = OrderType();
+
+      bool orderTypeDifferentThanCrossEnv = maCross.orderEnvironment == ENV_BUY && (OP == OP_SELL || OP == OP_SELLSTOP || OP == OP_SELLLIMIT);
+      orderTypeDifferentThanCrossEnv = orderTypeDifferentThanCrossEnv || (maCross.orderEnvironment == ENV_SELL && (OP == OP_BUY || OP == OP_BUYSTOP || OP == OP_BUYLIMIT));
+
+      if (orderTime < cross_Time || orderTypeDifferentThanCrossEnv)
+      {
         if (OP == OP_BUY || OP == OP_SELL)
         {
           OrderClose(
@@ -1240,7 +1244,7 @@ bool canCheckForSignals(string symbol, datetime crossTime)
     // FileWrite(handle, OrderTicket(), OrderOpenPrice(), OrderOpenTime(), OrderSymbol(), OrderLots());
   }
 
-  if (symbolHasProfitInCurrentCrossing(symbol, (int)crossTime))
+  if (symbolHasProfitInCurrentCrossing(symbol, (int)maCross.crossTime))
   {
     return false;
   }
