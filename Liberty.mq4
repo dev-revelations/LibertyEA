@@ -131,7 +131,13 @@ struct SignalResult
   int highestShift;   // Agar sell hast balatarin noghte ghable vorod
   int lowestShift;    // Agar buy hast payintarin noghte ghable vorod
   int moveDepthShift; // Cheghadr move zade
-  SignalResult() {}
+  SignalResult()
+  {
+    maChangeShift = -1;
+    highestShift = -1;
+    lowestShift = -1;
+    moveDepthShift = -1;
+  }
 };
 
 struct HigherTFCrossCheckResult
@@ -169,6 +175,18 @@ struct OrderInfoResult
     originalPrice = -1;
     pending = false;
     valid = false;
+  }
+};
+
+struct StrategyResult
+{
+  StrategyStatus status;
+  OrderInfoResult orderInfo;
+  SignalResult signal;
+
+  StrategyResult()
+  {
+    status = STRATEGY_STATUS_LOCKED;
   }
 };
 
@@ -337,22 +355,22 @@ void scanSymbolGroups()
 
       simulate(symbol, lower_timeframe);
 
-      StrategyStatus result = runStrategy1(symbol, lower_timeframe, higher_timeframe, availableEnvInGroup != ENV_NONE, availableEnvInGroup);
-
+      StrategyResult result = runStrategy1(symbol, lower_timeframe, higher_timeframe, availableEnvInGroup != ENV_NONE, availableEnvInGroup);
+      StrategyStatus status = result.status;
       // If for any reason the strategy is locked for the current symbol then we will ignore it
       // In current context it happens when the symbol had profits in pervious sessions and in current crossing
-      if (result == STRATEGY_STATUS_LOCKED && group.active_symbol_buy != symbol && group.active_symbol_sell != symbol)
+      if (status == STRATEGY_STATUS_LOCKED && group.active_symbol_buy != symbol && group.active_symbol_sell != symbol)
       {
         continue;
       }
 
       // Agar active symbol ghablan set nashode bud angah symbol ra set mikonim
       // Be in mani ast ke in symbol avalin symboli hast ke signal midahad
-      if ((result == STRATEGY_STATUS_IMMEDIATE_BUY || result == STRATEGY_STATUS_PENDING_BUY) && group.active_symbol_buy == "")
+      if ((status == STRATEGY_STATUS_IMMEDIATE_BUY || status == STRATEGY_STATUS_PENDING_BUY) && group.active_symbol_buy == "")
       {
         group.active_symbol_buy = symbol;
       }
-      else if ((result == STRATEGY_STATUS_IMMEDIATE_SELL || result == STRATEGY_STATUS_PENDING_SELL) && group.active_symbol_sell == "")
+      else if ((status == STRATEGY_STATUS_IMMEDIATE_SELL || status == STRATEGY_STATUS_PENDING_SELL) && group.active_symbol_sell == "")
       {
         group.active_symbol_sell = symbol;
       }
@@ -360,22 +378,22 @@ void scanSymbolGroups()
       // Agar symbole jari haman symbole montakhab bud
       // Va agar natije in bud ke symbol mitavanad signale jadid check konad
       // Be ebarate digar agar faghat symbole active meghdare 0 bargardanad baraye ma ahamiat darad
-      if (result == STRATEGY_STATUS_CHECKING_SIGNALS && group.active_symbol_buy == symbol)
+      if (status == STRATEGY_STATUS_CHECKING_SIGNALS && group.active_symbol_buy == symbol)
       {
         group.active_symbol_buy = "";
       }
 
-      if (result == STRATEGY_STATUS_CHECKING_SIGNALS && group.active_symbol_sell == symbol)
+      if (status == STRATEGY_STATUS_CHECKING_SIGNALS && group.active_symbol_sell == symbol)
       {
         group.active_symbol_sell = "";
       }
 
       // Jaygozinie ordere pending ba ordere Immediate
-      bool canReplaceExistingPendingInCurrentGroup = PrioritizeSameGroup && group.active_symbol_buy != symbol && group.active_symbol_buy != "" && isActiveSymPendingBuy && result == STRATEGY_STATUS_IMMEDIATE_BUY;
+      bool canReplaceExistingPendingInCurrentGroup = PrioritizeSameGroup && group.active_symbol_buy != symbol && group.active_symbol_buy != "" && isActiveSymPendingBuy && status == STRATEGY_STATUS_IMMEDIATE_BUY;
       if (canReplaceExistingPendingInCurrentGroup)
       {
         result = runStrategy1(symbol, lower_timeframe, higher_timeframe, true, ENV_BUY);
-        if (result == STRATEGY_STATUS_IMMEDIATE_BUY)
+        if (result.status == STRATEGY_STATUS_IMMEDIATE_BUY)
         {
           if (OrderDelete(activeTicketBuy, clrAzure))
           {
@@ -388,11 +406,11 @@ void scanSymbolGroups()
         }
       }
 
-      canReplaceExistingPendingInCurrentGroup = PrioritizeSameGroup && group.active_symbol_sell != symbol && group.active_symbol_sell != "" && isActiveSymPendingSell && result == STRATEGY_STATUS_IMMEDIATE_SELL;
+      canReplaceExistingPendingInCurrentGroup = PrioritizeSameGroup && group.active_symbol_sell != symbol && group.active_symbol_sell != "" && isActiveSymPendingSell && status == STRATEGY_STATUS_IMMEDIATE_SELL;
       if (canReplaceExistingPendingInCurrentGroup)
       {
         result = runStrategy1(symbol, lower_timeframe, higher_timeframe, true, ENV_SELL);
-        if (result == STRATEGY_STATUS_IMMEDIATE_SELL)
+        if (result.status == STRATEGY_STATUS_IMMEDIATE_SELL)
         {
           if (OrderDelete(activeTicketSell, clrAzure))
           {
@@ -417,9 +435,10 @@ void scanSymbolGroups()
       activeSymbolsListSell);
 }
 
-StrategyStatus runStrategy1(string symbol, ENUM_TIMEFRAMES lowTF, ENUM_TIMEFRAMES highTF, bool trade = true, OrderEnvironment allowedEnv = ENV_BOTH)
+StrategyResult runStrategy1(string symbol, ENUM_TIMEFRAMES lowTF, ENUM_TIMEFRAMES highTF, bool trade = true, OrderEnvironment allowedEnv = ENV_BOTH)
 {
-  StrategyStatus result = STRATEGY_STATUS_LOCKED;
+  StrategyResult result;
+  result.status = STRATEGY_STATUS_LOCKED;
   HigherTFCrossCheckResult maCross = findHigherTimeFrameMACross(symbol, highTF);
   if (maCross.found)
   {
@@ -428,11 +447,12 @@ StrategyStatus runStrategy1(string symbol, ENUM_TIMEFRAMES lowTF, ENUM_TIMEFRAME
 
     if (canCheckSignals)
     {
-      result = STRATEGY_STATUS_CHECKING_SIGNALS;
+      result.status = STRATEGY_STATUS_CHECKING_SIGNALS;
     }
     else
     {
-      return STRATEGY_STATUS_LOCKED;
+      result.status = STRATEGY_STATUS_LOCKED;
+      return result;
     }
 
     bool isTimeAllowed = TimeFilter(SessionStart1, SessionEnd1) || TimeFilter(SessionStart2, SessionEnd2) || TimeFilter(SessionStart3, SessionEnd3);
@@ -484,12 +504,15 @@ StrategyStatus runStrategy1(string symbol, ENUM_TIMEFRAMES lowTF, ENUM_TIMEFRAME
             // Preparing the strategy result
             if (maCross.orderEnvironment == ENV_SELL)
             {
-              result = orderCalculated.pending == false ? STRATEGY_STATUS_IMMEDIATE_SELL : STRATEGY_STATUS_PENDING_SELL;
+              result.status = orderCalculated.pending == false ? STRATEGY_STATUS_IMMEDIATE_SELL : STRATEGY_STATUS_PENDING_SELL;
             }
             else if (maCross.orderEnvironment == ENV_BUY)
             {
-              result = orderCalculated.pending == false ? STRATEGY_STATUS_IMMEDIATE_BUY : STRATEGY_STATUS_PENDING_BUY;
+              result.status = orderCalculated.pending == false ? STRATEGY_STATUS_IMMEDIATE_BUY : STRATEGY_STATUS_PENDING_BUY;
             }
+
+            result.orderInfo = orderCalculated;
+            result.signal = lastSignal;
 
             return result;
           }
