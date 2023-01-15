@@ -133,13 +133,13 @@ void runEA()
     return;
   }
 
-  int currentTime = TimeLocal();
+  int currentTime = (int)TimeLocal();
   int timePassed = (currentTime - minuteTimer) / 60;
 
   if (timePassed >= 1)
   {
     initializeMAs();
-    minuteTimer = TimeLocal();
+    minuteTimer = (int)TimeLocal();
   }
 
   if (SingleChart)
