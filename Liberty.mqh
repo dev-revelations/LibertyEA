@@ -103,6 +103,11 @@ struct StrategyResult
     }
 };
 
+struct MA_Array
+{
+    double MA[];
+};
+
 struct GroupStruct
 {
     string symbols[];
@@ -112,6 +117,8 @@ struct GroupStruct
     int bars[];
     StrategyResult active_strategy_buy;
     StrategyResult active_strategy_sell;
+    MA_Array MA5[];
+    MA_Array MA10[];
 
     GroupStruct()
     {

@@ -10,6 +10,7 @@
 
 #include <WinUser32.mqh>
 #include "Liberty.mqh"
+#include "LibertyMA.mqh"
 
 extern bool SingleChart = false; // Single Chart Scan
 // extern bool PrioritizeSameGroup = true;                                  // Prioritize Same Group Symbols
@@ -73,6 +74,7 @@ const ushort SYMBOL_SEPARATOR = ' ';
 GroupStruct GROUPS[];
 int GROUPS_LENGTH = 0;
 
+int minuteTimer = 0;
 //////////////////////////////////////////////////////////////////////////////
 
 //+------------------------------------------------------------------+
@@ -86,6 +88,7 @@ int OnInit()
     EventSetTimer(EATimerSconds);
   }
   initializeGroups();
+  initializeMAs();
   //---
   return (INIT_SUCCEEDED);
 }
@@ -128,6 +131,15 @@ void runEA()
   if (!IsTradeAllowed())
   {
     return;
+  }
+
+  int currentTime = TimeLocal();
+  int timePassed = (currentTime - minuteTimer) / 60;
+
+  if (timePassed >= 1)
+  {
+    initializeMAs();
+    minuteTimer = TimeLocal();
   }
 
   if (SingleChart)
@@ -467,14 +479,14 @@ HigherTFCrossCheckResult findHigherTimeFrameMACross(string symbol, ENUM_TIMEFRAM
     if (actualShift < 0)
       debug("Shift Error");
 
-    double MA5_current = getMA(symbol, higherTF, 5, actualShift);
-    double MA5_prev = getMA(symbol, higherTF, 5, actualShift + 1);
+    double MA5_current = getLibertyMA(symbol, 5, i);  // getMA(symbol, higherTF, 5, actualShift);
+    double MA5_prev = getLibertyMA(symbol, 5, i + 1); // getMA(symbol, higherTF, 5, actualShift + 1);
 
-    double MA10_current = getMA(symbol, higherTF, 10, actualShift);
-    double MA10_prev = getMA(symbol, higherTF, 10, actualShift + 1);
+    double MA10_current = getLibertyMA(symbol, 10, i);  // getMA(symbol, higherTF, 10, actualShift);
+    double MA10_prev = getLibertyMA(symbol, 10, i + 1); // getMA(symbol, higherTF, 10, actualShift + 1);
 
     // Only Current TimeFrame data
-    int higherTFBeginningInCurrentPeriod = i + (int)(higherTF / Period()) - 1;
+    int higherTFBeginningInCurrentPeriod = i; // i + (int)(higherTF / Period()) - 1;
     datetime currentShiftTime = iTime(symbol, PERIOD_CURRENT, higherTFBeginningInCurrentPeriod);
     double price = iOpen(symbol, PERIOD_CURRENT, higherTFBeginningInCurrentPeriod);
 
@@ -506,11 +518,11 @@ HigherTFCrossCheckResult findHigherTimeFrameMACross(string symbol, ENUM_TIMEFRAM
   // last validation
   if (result.found && Enable_MA_Closing)
   {
-    double MA5_current = iMA(symbol, higherTF, 5, 0, MODE_SMA, PRICE_CLOSE, 0); // getMA(symbol, higherTF, 5, 0);
-    double MA5_prev = iMA(symbol, higherTF, 5, 0, MODE_SMA, PRICE_CLOSE, 1);    // getMA(symbol, higherTF, 5, 1);
+    double MA5_current = getLibertyMA(symbol, 5, 0); // iMA(symbol, higherTF, 5, 0, MODE_SMA, PRICE_CLOSE, 0);
+    double MA5_prev = getLibertyMA(symbol, 5, 1);    // iMA(symbol, higherTF, 5, 0, MODE_SMA, PRICE_CLOSE, 1);
 
-    double MA10_current = iMA(symbol, higherTF, 10, 0, MODE_SMA, PRICE_CLOSE, 0); // getMA(symbol, higherTF, 10, 0);
-    double MA10_prev = iMA(symbol, higherTF, 10, 0, MODE_SMA, PRICE_CLOSE, 1);    // getMA(symbol, higherTF, 10, 1);
+    double MA10_current = getLibertyMA(symbol, 10, 0); // iMA(symbol, higherTF, 10, 0, MODE_SMA, PRICE_CLOSE, 0);
+    double MA10_prev = getLibertyMA(symbol, 10, 1);    // iMA(symbol, higherTF, 10, 0, MODE_SMA, PRICE_CLOSE, 1);
 
     const bool buyValidation = (MA5_current > MA10_current);
     const bool sellValidation = (MA5_current < MA10_current);
@@ -553,7 +565,7 @@ bool isAreaTouched(string symbol, ENUM_TIMEFRAMES higherTF, OrderEnvironment ord
 
   if (actualHigherShift >= 0)
   {
-    double h4_ma5 = getMA(symbol, higherTF, 5, actualHigherShift);
+    double h4_ma5 = getLibertyMA(symbol, 5, shift); // getMA(symbol, higherTF, 5, actualHigherShift);
     if (orderEnv == ENV_SELL)
     {
       double m5_high = iHigh(symbol, lower_tf, shift);
@@ -1388,6 +1400,9 @@ void initializeGroups()
     ArrayResize(group.bars, group.symbols_count);
     ArrayFill(group.bars, 0, group.symbols_count, 0);
 
+    ArrayResize(group.MA10, group.symbols_count);
+    ArrayResize(group.MA5, group.symbols_count);
+
     // Check mikonim agar zamane baz shodane EA orderhaye bazi dashtim ke marboot be symbol bud
     // An symbol ra be onvane active symbole marboot be group set mikonim
     for (int symIndex = 0; symIndex < group.symbols_count; symIndex++)
@@ -1446,6 +1461,63 @@ void initializeGroups()
   }
 
   debug("==========================");
+}
+
+void initializeMAs()
+{
+  for (int groupIdx = 0; groupIdx < GROUPS_LENGTH; groupIdx++)
+  {
+
+    GroupStruct group = GROUPS[groupIdx];
+
+    for (int symbolIdx = 0; symbolIdx < group.symbols_count; symbolIdx++)
+    {
+      string symbol = group.symbols[symbolIdx];
+
+      // iMA(symbol, higherTF, 5, 0, MODE_SMA, PRICE_CLOSE, 0);
+      MA_Array maArr = group.MA5[symbolIdx];
+      initLibertyMA(maArr.MA, symbol, higher_timeframe, 5, MODE_SMA, PRICE_CLOSE);
+      group.MA5[symbolIdx] = maArr;
+
+      maArr = group.MA10[symbolIdx];
+      initLibertyMA(maArr.MA, symbol, higher_timeframe, 10, MODE_SMA, PRICE_CLOSE);
+      group.MA10[symbolIdx] = maArr;
+    }
+
+    GROUPS[groupIdx] = group;
+  }
+}
+
+double getLibertyMA(string symbol, int period, int shift)
+{
+
+  for (int groupIdx = 0; groupIdx < GROUPS_LENGTH; groupIdx++)
+  {
+
+    GroupStruct group = GROUPS[groupIdx];
+
+    for (int symbolIdx = 0; symbolIdx < group.symbols_count; symbolIdx++)
+    {
+      string sym = group.symbols[symbolIdx];
+      if (symbol == sym && iBars(sym, lower_timeframe) > 0)
+      {
+        switch (period)
+        {
+        case 5:
+          return group.MA5[symbolIdx].MA[shift];
+          break;
+        case 10:
+          return group.MA10[symbolIdx].MA[shift];
+          break;
+
+        default:
+          return EMPTY_VALUE;
+        }
+      }
+    }
+  }
+
+  return EMPTY_VALUE;
 }
 
 bool isOpPending(int op)
@@ -1736,7 +1808,7 @@ void drawArrowObj(long chartId, int shift, bool up = true, string id = "", int c
   ObjectSetInteger(chartId, id2, OBJPROP_WIDTH, 5);
 }
 
-void drawValidationObj(long chartId, int shift, bool up = true, bool valid = true, string id = "", int clr = C'9,255,9')
+void drawValidationObj(long chartId, int shift, bool up = true, bool valid = true, string id = "", int clr = C '9,255,9')
 {
   string symbol = ChartSymbol(chartId);
   datetime time = iTime(symbol, PERIOD_CURRENT, shift);
@@ -1805,6 +1877,8 @@ void simulate(string symbol, ENUM_TIMEFRAMES low_tf)
         HigherTFCrossCheckResult maCross = findHigherTimeFrameMACross(symbol, higher_timeframe);
         if (maCross.found)
         {
+          deleteObjectsAll(chartId);
+          drawVLine(chartId, maCross.crossCandleShift, "Order_" + IntegerToString(maCross.crossCandleShift), clrBlanchedAlmond);
 
           int firstAreaTouchShift = findAreaTouch(symbol, higher_timeframe, maCross.orderEnvironment, maCross.crossCandleShift, PERIOD_CURRENT);
 
@@ -1814,10 +1888,6 @@ void simulate(string symbol, ENUM_TIMEFRAMES low_tf)
             SignalResult signals[];
             listSignals(signals, symbol, low_tf, maCross.orderEnvironment, firstAreaTouchShift);
 
-            deleteObjectsAll(chartId);
-
-            drawVLine(chartId, maCross.crossCandleShift, "Order_" + IntegerToString(maCross.crossCandleShift), clrBlanchedAlmond);
-
             int listSize = ArraySize(signals);
             for (int i = 0; i < listSize; i++)
             {
@@ -1825,18 +1895,18 @@ void simulate(string symbol, ENUM_TIMEFRAMES low_tf)
 
               OrderInfoResult orderCalculated;
 
-              double hsColor = C'60,167,17';
-              double lsColor = C'249,0,0';
+              double hsColor = C '60,167,17';
+              double lsColor = C '249,0,0';
               int orderColor = clrAqua;
-              double depthOfMoveColor = C'207,0,249';
+              double depthOfMoveColor = C '207,0,249';
 
               const int active = ActiveSignalForTest;
 
               if (i == active)
               {
-                lsColor = C'255,230,6';
+                lsColor = C '255,230,6';
                 orderColor = clrGreen;
-                depthOfMoveColor = C'249,0,0';
+                depthOfMoveColor = C '249,0,0';
                 drawVLine(chartId, item.maChangeShift, IntegerToString(item.maChangeShift) + "test", orderColor);
               }
 
@@ -1863,14 +1933,14 @@ void simulate(string symbol, ENUM_TIMEFRAMES low_tf)
 
               orderCalculated = validateOrderDistance(symbol, low_tf, maCross.orderEnvironment, signals, i);
 
-              drawValidationObj(chartId, item.maChangeShift, maCross.orderEnvironment == ENV_BUY, orderCalculated.valid, IntegerToString(item.maChangeShift), orderCalculated.valid ? C'9,255,9' : C'249,92,92');
+              drawValidationObj(chartId, item.maChangeShift, maCross.orderEnvironment == ENV_BUY, orderCalculated.valid, IntegerToString(item.maChangeShift), orderCalculated.valid ? C '9,255,9' : C '249,92,92');
 
               if (i == active && ShowTP_SL)
               {
                 string id = IntegerToString(i);
-                drawHLine(chartId, orderCalculated.orderPrice, "_order_" + id, orderCalculated.pending ? C'245,46,219' : C'0,191,73');
-                drawHLine(chartId, orderCalculated.slPrice, "_sl_" + id, C'255,5,5');
-                drawHLine(chartId, orderCalculated.tpPrice, "_tp_" + id, C'0,119,255');
+                drawHLine(chartId, orderCalculated.orderPrice, "_order_" + id, orderCalculated.pending ? C '245,46,219' : C '0,191,73');
+                drawHLine(chartId, orderCalculated.slPrice, "_sl_" + id, C '255,5,5');
+                drawHLine(chartId, orderCalculated.tpPrice, "_tp_" + id, C '0,119,255');
               }
             }
           }
