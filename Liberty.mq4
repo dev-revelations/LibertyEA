@@ -327,6 +327,9 @@ void scanSymbolGroups()
           canOpen = OrderDelete(activeTicketBuy, clrAzure);
         }
 
+        // If Not have an already open order
+        canOpen = canOpen && (selectOpenOrderTicketFor(sr.symbol) > -1);
+
         if (canOpen)
         {
           debug("Prioritized order replacement (" + group.active_symbol_buy + " => " + sr.symbol + ")");
@@ -350,6 +353,9 @@ void scanSymbolGroups()
         {
           canOpen = OrderDelete(activeTicketSell, clrAzure);
         }
+
+        // If Not have an already open order
+        canOpen = canOpen && (selectOpenOrderTicketFor(sr.symbol) > -1);
 
         if (canOpen)
         {
@@ -1808,7 +1814,7 @@ void drawArrowObj(long chartId, int shift, bool up = true, string id = "", int c
   ObjectSetInteger(chartId, id2, OBJPROP_WIDTH, 5);
 }
 
-void drawValidationObj(long chartId, int shift, bool up = true, bool valid = true, string id = "", int clr = C '9,255,9')
+void drawValidationObj(long chartId, int shift, bool up = true, bool valid = true, string id = "", int clr = C'9,255,9')
 {
   string symbol = ChartSymbol(chartId);
   datetime time = iTime(symbol, PERIOD_CURRENT, shift);
@@ -1895,18 +1901,18 @@ void simulate(string symbol, ENUM_TIMEFRAMES low_tf)
 
               OrderInfoResult orderCalculated;
 
-              double hsColor = C '60,167,17';
-              double lsColor = C '249,0,0';
+              double hsColor = C'60,167,17';
+              double lsColor = C'249,0,0';
               int orderColor = clrAqua;
-              double depthOfMoveColor = C '207,0,249';
+              double depthOfMoveColor = C'207,0,249';
 
               const int active = ActiveSignalForTest;
 
               if (i == active)
               {
-                lsColor = C '255,230,6';
+                lsColor = C'255,230,6';
                 orderColor = clrGreen;
-                depthOfMoveColor = C '249,0,0';
+                depthOfMoveColor = C'249,0,0';
                 drawVLine(chartId, item.maChangeShift, IntegerToString(item.maChangeShift) + "test", orderColor);
               }
 
@@ -1933,14 +1939,14 @@ void simulate(string symbol, ENUM_TIMEFRAMES low_tf)
 
               orderCalculated = validateOrderDistance(symbol, low_tf, maCross.orderEnvironment, signals, i);
 
-              drawValidationObj(chartId, item.maChangeShift, maCross.orderEnvironment == ENV_BUY, orderCalculated.valid, IntegerToString(item.maChangeShift), orderCalculated.valid ? C '9,255,9' : C '249,92,92');
+              drawValidationObj(chartId, item.maChangeShift, maCross.orderEnvironment == ENV_BUY, orderCalculated.valid, IntegerToString(item.maChangeShift), orderCalculated.valid ? C'9,255,9' : C'249,92,92');
 
               if (i == active && ShowTP_SL)
               {
                 string id = IntegerToString(i);
-                drawHLine(chartId, orderCalculated.orderPrice, "_order_" + id, orderCalculated.pending ? C '245,46,219' : C '0,191,73');
-                drawHLine(chartId, orderCalculated.slPrice, "_sl_" + id, C '255,5,5');
-                drawHLine(chartId, orderCalculated.tpPrice, "_tp_" + id, C '0,119,255');
+                drawHLine(chartId, orderCalculated.orderPrice, "_order_" + id, orderCalculated.pending ? C'245,46,219' : C'0,191,73');
+                drawHLine(chartId, orderCalculated.slPrice, "_sl_" + id, C'255,5,5');
+                drawHLine(chartId, orderCalculated.tpPrice, "_tp_" + id, C'0,119,255');
               }
             }
           }
