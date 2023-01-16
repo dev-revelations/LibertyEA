@@ -180,12 +180,12 @@ void scanSymbolGroups()
 
     if (group.active_symbol_buy != "")
     {
-      activeSymbolsListBuy += group.active_symbol_buy + "\n";
+      activeSymbolsListBuy += "Group(" + IntegerToString(groupIdx) + ") = " + group.active_symbol_buy + "\n";
     }
 
     if (group.active_symbol_sell != "")
     {
-      activeSymbolsListSell += group.active_symbol_sell + "\n";
+      activeSymbolsListSell += "Group(" + IntegerToString(groupIdx) + ") = " + group.active_symbol_sell + "\n";
     }
 
     ////////////// Define Prioritization For The Active Symbols //////////////
