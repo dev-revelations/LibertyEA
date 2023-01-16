@@ -9,12 +9,23 @@
 #property strict
 
 #include <WinUser32.mqh>
+#include "Liberty.mqh"
+#include "LibertyMA.mqh"
 
-extern ENUM_TIMEFRAMES higher_timeframe = PERIOD_H4;
-extern bool Enable_MA_Closing = false;                // Enable MA Closing Detection
-extern double MA_Closing_AverageCandleSize_Ratio = 2; // MA closing ratio in Average Candle Size
-extern int MA_Closing_Delay = 2;                      // Number of higher TF candles should wait
-extern string _separator2 = "===================";    // ===== Order Settings =====
+extern bool SingleChart = false; // Single Chart Scan
+// extern bool PrioritizeSameGroup = true;                                  // Prioritize Same Group Symbols
+extern bool EnableEATimer = true;                                        // Enable EA Timer
+extern int EATimerSconds = 1;                                            // EA Timer Interval Seconds
+extern bool CheckSignalsOnNewCandle = true;                              // Check for signals on new candle openning
+extern string _separator1 = "=======================================";   // ===== Higher Timeframe =====
+extern ENUM_TIMEFRAMES higher_timeframe = PERIOD_H4;                     // Higher Timeframe
+extern bool Enable_MA_Closing = false;                                   // Enable MA Closing Detection
+extern double MA_Closing_AverageCandleSize_Ratio = 2;                    // MA closing ratio in Average Candle Size
+extern int MA_Closing_Delay = 2;                                         // Number of higher TF candles should wait
+extern string _separator1_1 = "======================================="; // ===== Lower Timeframe =====
+extern ENUM_TIMEFRAMES lower_timeframe = PERIOD_M5;                      // Lower Timeframe (Never select current)
+extern bool OnlyMaCandleBreaks = true;                                   // Shohld candle break MA?
+extern string _separator2 = "=======================================";   // ===== Order Settings =====
 extern int MagicNumber = 1111;
 extern double RiskPercent = 1;
 extern double TakeProfitRatio = 3;
@@ -22,94 +33,62 @@ extern double TakeProfitRatio = 3;
 extern double StopLossGapInAverageCandleSize = 0.2;
 extern double AverageCandleSizeRatio = 2.25;
 extern int AverageCandleSizePeriod = 40;
-extern int PendingsExpirationMinutes = 1000;
+extern int PendingsExpirationMinutes = 300;
 extern string CommentText = "";
-extern bool EnableBreakEven = true;                // Enable Break Even
-extern double BreakEvenRatio = 2.75;               // Break Even Ratio
-extern double BreakEvenGapPip = 2;                 // Break Even Gap Pip
-extern string _separator3 = "==================="; // ===== Lower TF Settings =====
-extern bool OnlyMaCandleBreaks = true;             // Shohld candle break MA?
-extern string _separator5 = "==================="; // ===== Test & Simulation =====
+extern bool EnableBreakEven = true;                                      // Enable Break Even
+extern double BreakEvenRatio = 2.5;                                      // Break Even Ratio
+extern double BreakEvenGapPip = 2;                                       // Break Even Gap Pip
+extern string _separator4 = "=======================================";   // ===== Sessions (Min = 0 , Max = 24) =====
+extern int GMTOffset = 2;                                                // GMT Offset
+extern bool EnableTradingSession1 = true;                                // Enable Trading in Session 1
+extern int SessionStart1 = 0;                                            // Session Start 1
+extern int SessionEnd1 = 17;                                             // Session End 1
+extern bool EnableTradingSession2 = false;                               // Enable Trading in Session 2
+extern int SessionStart2 = 18;                                           // Session Start 2
+extern int SessionEnd2 = 23;                                             // Session End 2
+extern bool EnableTradingSession3 = false;                               // Enable Trading in Session 3
+extern int SessionStart3 = 18;                                           // Session Start 3
+extern int SessionEnd3 = 23;                                             // Session End 3
+extern string _separator4_1 = "======================================="; // ===== Custom Groups =====
+extern string CustomGroup1 = "GER30 F40 UK100 US30 US2000 US500";
+extern string CustomGroup2 = "USOIL";
+extern string _separator5 = "======================================="; // ===== Test & Simulation =====
 extern bool EnableSimulation = false;
+extern bool ClearObjects = false; // Clear Objects If Simulation Is Off
 extern int ActiveSignalForTest = 0;
+extern bool ShowTP_SL = false; // Show TP & SL Lines
 
-enum OrderEnvironment
-{
-  ENV_NONE,
-  ENV_BUY,
-  ENV_SELL
-};
+/////////////////////////////////// Symbol Groups Data Structures///////////////////////////////////////////
 
-enum MaDirection
-{
-  MA_NONE,
-  MA_UP,
-  MA_DOWN
-};
+string GROUPS_STR[] = {
+    "EURUSD GBPUSD AUDUSD NZDUSD",
+    "USDCHF GBPCHF CADCHF EURCHF NZDCHF AUDCHF",
+    "USDJPY EURJPY GBPJPY NZDJPY AUDJPY CHFJPY CADJPY",
+    "USDCAD EURCAD GBPCAD AUDCAD NZDCAD",
+    "EURNZD GBPNZD AUDNZD",
+    "EURAUD GBPAUD",
+    "EURGBP",
+    "XAUUSD"};
 
-struct LowMaChangeResult
-{
-  MaDirection dir;
-  int lastChangeShift;
+const ushort SYMBOL_SEPARATOR = ' ';
+GroupStruct GROUPS[];
+int GROUPS_LENGTH = 0;
 
-  LowMaChangeResult()
-  {
-  }
-};
+int minuteTimer = 0;
+//////////////////////////////////////////////////////////////////////////////
 
-struct SignalResult
-{
-  int maChangeShift;  // Noghteye taghir
-  int highestShift;   // Agar sell hast balatarin noghte ghable vorod
-  int lowestShift;    // Agar buy hast payintarin noghte ghable vorod
-  int moveDepthShift; // Cheghadr move zade
-  SignalResult() {}
-};
-
-struct HigherTFCrossCheckResult
-{
-  OrderEnvironment orderEnvironment;
-  datetime crossTime;
-  double crossOpenPrice;
-  int crossCandleShift;
-  ENUM_TIMEFRAMES crossCandleShiftTimeframe;
-  bool found;
-  int crossCandleHigherTfShift;
-
-  HigherTFCrossCheckResult()
-  {
-    found = false;
-    crossCandleHigherTfShift = -1;
-  }
-};
-
-struct OrderInfoResult
-{
-  double slPrice;
-  double tpPrice;
-  double orderPrice;        // Final decision
-  double pendingOrderPrice; // Calculated pending price
-  double originalPrice;     // Original price before any decision
-  bool pending;
-  bool valid;
-  OrderInfoResult()
-  {
-    slPrice = -1;
-    tpPrice = -1;
-    orderPrice = -1;
-    pendingOrderPrice = -1;
-    originalPrice = -1;
-    pending = false;
-    valid = false;
-  }
-};
 //+------------------------------------------------------------------+
 //| Expert initialization function                                   |
 //+------------------------------------------------------------------+
 int OnInit()
 {
   //---
-  EventSetTimer(2);
+  if (EnableEATimer)
+  {
+    EventSetTimer(EATimerSconds);
+  }
+  initializeGroups();
+  initializeMAs();
   //---
   return (INIT_SUCCEEDED);
 }
@@ -119,7 +98,10 @@ int OnInit()
 void OnDeinit(const int reason)
 {
   //---
-  EventKillTimer();
+  if (EnableEATimer)
+  {
+    EventKillTimer();
+  }
 }
 //+------------------------------------------------------------------+
 //| Expert tick function                                             |
@@ -127,77 +109,361 @@ void OnDeinit(const int reason)
 void OnTick()
 {
   //---
-
-  runStrategy1(_Symbol, PERIOD_M5, higher_timeframe);
+  if (!EnableEATimer)
+  {
+    runEA();
+  }
 }
 //+------------------------------------------------------------------+
 void OnTimer()
 {
-  OnTick();
+  if (EnableEATimer)
+  {
+    // OnTick();
+    runEA();
+  }
 }
 
-void runStrategy1(string symbol, ENUM_TIMEFRAMES lowTF, ENUM_TIMEFRAMES highTF)
+void runEA()
 {
+  processEAOrders();
+
+  if (!IsTradeAllowed())
+  {
+    return;
+  }
+
+  if (minutesPassed())
+  {
+    initializeMAs();
+  }
+
+  if (SingleChart)
+  {
+    runStrategy1(_Symbol, lower_timeframe, higher_timeframe);
+  }
+  else
+  {
+    scanSymbolGroups();
+  }
+}
+
+void scanSymbolGroups()
+{
+  string activeSymbolsListBuy = "";
+  string activeSymbolsListSell = "";
+
+  for (int groupIdx = 0; groupIdx < GROUPS_LENGTH; groupIdx++)
+  {
+
+    clearOrderPriorityList();
+
+    GroupStruct group = GROUPS[groupIdx];
+
+    ////////////// Define Available Order Environments For The Group //////////////
+
+    OrderEnvironment availableEnvInGroup = ENV_BOTH;
+
+    if (group.active_symbol_buy != "" && group.active_symbol_sell == "")
+    {
+      availableEnvInGroup = ENV_SELL;
+    }
+    else if (group.active_symbol_sell != "" && group.active_symbol_buy == "")
+    {
+      availableEnvInGroup = ENV_BUY;
+    }
+    else if (group.active_symbol_sell != "" && group.active_symbol_buy != "")
+    {
+      availableEnvInGroup = ENV_NONE;
+    }
+
+    ////////////// Adding Active Symbols to the Comment //////////////
+
+    if (group.active_symbol_buy != "")
+    {
+      activeSymbolsListBuy += "Group(" + IntegerToString(groupIdx) + ") = " + group.active_symbol_buy + "\n";
+    }
+
+    if (group.active_symbol_sell != "")
+    {
+      activeSymbolsListSell += "Group(" + IntegerToString(groupIdx) + ") = " + group.active_symbol_sell + "\n";
+    }
+
+    ////////////// Define Prioritization For The Active Symbols //////////////
+
+    bool isActiveSymPendingSell = true;
+    int activeTicketSell = -1;
+    if (/* PrioritizeSameGroup && */ group.active_symbol_sell != "")
+    {
+      activeTicketSell = selectOpenOrderTicketFor(group.active_symbol_sell);
+      if (activeTicketSell > -1)
+      {
+        int OP = OrderType();
+        isActiveSymPendingSell = isOpPending(OP);
+      }
+    }
+
+    bool isActiveSymPendingBuy = true;
+    int activeTicketBuy = -1;
+    if (/* PrioritizeSameGroup && */ group.active_symbol_buy != "")
+    {
+      activeTicketBuy = selectOpenOrderTicketFor(group.active_symbol_buy);
+      if (activeTicketBuy > -1)
+      {
+        int OP = OrderType();
+        isActiveSymPendingBuy = isOpPending(OP);
+      }
+    }
+
+    ////////////// Scanning Symbols In The Current Group //////////////
+
+    for (int symbolIdx = 0; symbolIdx < group.symbols_count; symbolIdx++)
+    {
+      string symbol = group.symbols[symbolIdx];
+
+      simulate(symbol, lower_timeframe);
+
+      if (IsTesting() && _Symbol != symbol)
+      {
+        continue;
+      }
+
+      // Check for new bars
+      if (CheckSignalsOnNewCandle)
+      {
+        int bars = iBars(symbol, lower_timeframe);
+        if (group.bars[symbolIdx] == bars)
+        {
+          continue;
+        }
+        else
+        {
+          group.bars[symbolIdx] = bars;
+        }
+      }
+
+      RefreshRates();
+
+      StrategyResult result = runStrategy1(symbol, lower_timeframe, higher_timeframe, false /* availableEnvInGroup != ENV_NONE */, availableEnvInGroup);
+      StrategyStatus status = result.status;
+      // If for any reason the strategy is locked for the current symbol then we will ignore it
+      // In current context it happens when the symbol had profits in pervious sessions and in current crossing
+      if (status == STRATEGY_STATUS_LOCKED && group.active_symbol_buy != symbol && group.active_symbol_sell != symbol)
+      {
+        continue;
+      }
+
+      /*
+        Agar active symbol ghablan set nashode bud va ya be onvane yek pending set shode bud
+        natijeye be dast amade az barresie strategy ra be onvane natijeye candid jahate
+        olaviat bandi zakhire mikonim ta morede moghayese ba natayeje ehtemalie digar dar
+        gorohe jari gharar begirad
+      */
+      if ((status == STRATEGY_STATUS_IMMEDIATE_BUY || status == STRATEGY_STATUS_PENDING_BUY))
+      {
+        if (group.active_symbol_buy == "" || (group.active_symbol_buy != "" && isActiveSymPendingBuy))
+        {
+          // group.active_symbol_buy = symbol;
+          addOrderPriority(result, OP_BUY);
+          debug("Candid added to priority list " + symbol);
+        }
+      }
+      else if ((status == STRATEGY_STATUS_IMMEDIATE_SELL || status == STRATEGY_STATUS_PENDING_SELL))
+      {
+        if (group.active_symbol_sell == "" || (group.active_symbol_sell != "" && isActiveSymPendingSell))
+        {
+          // group.active_symbol_sell = symbol;
+          addOrderPriority(result, OP_SELL);
+          debug("Candid added to priority list " + symbol);
+        }
+      }
+
+      // Agar symbole jari haman symbole montakhab bud
+      // Va agar natije in bud ke symbol mitavanad signale jadid check konad
+      // Be ebarate digar agar faghat symbole active meghdare 0 bargardanad baraye ma ahamiat darad
+      if (status == STRATEGY_STATUS_CHECKING_SIGNALS && group.active_symbol_buy == symbol)
+      {
+        group.active_symbol_buy = "";
+        StrategyResult sr;
+        group.active_strategy_buy = sr;
+      }
+
+      if (status == STRATEGY_STATUS_CHECKING_SIGNALS && group.active_symbol_sell == symbol)
+      {
+        group.active_symbol_sell = "";
+        StrategyResult sr;
+        group.active_strategy_sell = sr;
+      }
+    }
+
+    ////////////// Checking for prioritized candidate order //////////////
+
+    if (group.active_strategy_buy.symbol != "")
+      addOrderPriority(group.active_strategy_buy, OP_BUY);
+
+    if (group.active_strategy_sell.symbol != "")
+      addOrderPriority(group.active_strategy_sell, OP_SELL);
+
+    if (orderPriorityListLength(OP_BUY) > 0)
+    {
+      StrategyResult sr = getPrioritizedOrderStrategyResult(OP_BUY);
+
+      /*  Conditions:
+          1- valid candidate
+          2- candidate should be different than current active symbol
+          3- Not having current active symbol
+          4- or Having current active symbol which is pending and a candidate which is an immediate order
+       */
+      bool isBuyAllowed = sr.orderInfo.valid && sr.symbol != group.active_symbol_buy && (group.active_symbol_buy == "" || (isActiveSymPendingBuy && !sr.orderInfo.pending));
+      if (isBuyAllowed)
+      {
+        bool canOpen = true;
+        if (activeTicketBuy > -1 && isActiveSymPendingBuy)
+        {
+          canOpen = OrderDelete(activeTicketBuy, clrAzure);
+        }
+
+        // If Not have an already open order
+        canOpen = canOpen && (selectOpenOrderTicketFor(sr.symbol) <= 0);
+
+        if (canOpen)
+        {
+          debug("Prioritized order replacement (" + group.active_symbol_buy + " => " + sr.symbol + ")");
+          group.active_symbol_buy = sr.symbol;
+          group.active_strategy_buy = sr;
+          Order(sr.symbol, ENV_BUY, sr.orderInfo);
+        }
+      }
+    }
+
+    if (orderPriorityListLength(OP_SELL) > 0)
+    {
+      StrategyResult sr = getPrioritizedOrderStrategyResult(OP_SELL);
+
+      bool isSellAllowed = sr.orderInfo.valid && sr.symbol != group.active_symbol_sell && (group.active_symbol_sell == "" || (isActiveSymPendingSell && !sr.orderInfo.pending));
+      if (isSellAllowed)
+      {
+        bool canOpen = true;
+
+        if (activeTicketSell > -1 && isActiveSymPendingSell)
+        {
+          canOpen = OrderDelete(activeTicketSell, clrAzure);
+        }
+
+        // If Not have an already open order
+        canOpen = canOpen && (selectOpenOrderTicketFor(sr.symbol) <= 0);
+
+        if (canOpen)
+        {
+          debug("Prioritized order replacement (" + group.active_symbol_sell + " => " + sr.symbol + ")");
+          group.active_symbol_sell = sr.symbol;
+          group.active_strategy_sell = sr;
+          Order(sr.symbol, ENV_SELL, sr.orderInfo);
+        }
+      }
+    }
+
+    GROUPS[groupIdx] = group; // Hatman bayad dobare set shavad ta taghirat emal shavad
+  }
+
+  Comment(
+      "Current Session: " + IntegerToString(getSessionNumber(TimeCurrent())),
+      "\nActive Symbols (BUY):\n",
+      activeSymbolsListBuy,
+      "\nActive Symbols (SELL):\n",
+      activeSymbolsListSell);
+}
+
+StrategyResult runStrategy1(string symbol, ENUM_TIMEFRAMES lowTF, ENUM_TIMEFRAMES highTF, bool trade = true, OrderEnvironment allowedEnv = ENV_BOTH)
+{
+  StrategyResult result;
+  result.status = STRATEGY_STATUS_LOCKED;
+  result.symbol = symbol;
   HigherTFCrossCheckResult maCross = findHigherTimeFrameMACross(symbol, highTF);
   if (maCross.found)
   {
 
-    const bool canCheckSignals = proccessOrders(symbol, maCross.crossTime);
+    const bool canCheckSignals = canCheckForSignals(symbol, maCross);
 
-    if (!canCheckSignals)
+    if (canCheckSignals)
     {
-      return;
+      result.status = STRATEGY_STATUS_CHECKING_SIGNALS;
+    }
+    else
+    {
+      result.status = STRATEGY_STATUS_LOCKED;
+      return result;
     }
 
-    int firstAreaTouchShift = findAreaTouch(symbol, highTF, maCross.orderEnvironment, maCross.crossCandleShift, PERIOD_CURRENT);
+    result.maCross = maCross;
 
-    if (firstAreaTouchShift > 0 && maCross.orderEnvironment != ENV_NONE)
+    bool isTimeAllowed = TimeFilter(SessionStart1, SessionEnd1) || TimeFilter(SessionStart2, SessionEnd2) || TimeFilter(SessionStart3, SessionEnd3);
+
+    if (isTimeAllowed && isTradingEnabledInCurrentSession())
     {
-      SignalResult signals[];
-      listSignals(signals, symbol, lowTF, maCross.orderEnvironment, firstAreaTouchShift);
 
-      if (EnableSimulation)
-      {
-        simulate(symbol, lowTF, maCross, firstAreaTouchShift, signals);
-        drawVLine(maCross.crossCandleShift, "Order_" + IntegerToString(maCross.crossCandleShift), clrBlanchedAlmond);
-      }
+      int firstAreaTouchShift = findAreaTouch(symbol, highTF, maCross.orderEnvironment, maCross.crossCandleShift, PERIOD_CURRENT);
 
-      int signalsCount = ArraySize(signals);
-      if (signalsCount > 0)
+      if (firstAreaTouchShift > 0 && maCross.orderEnvironment != ENV_NONE)
       {
-        int lastSignalIndex = signalsCount - 1;
-        SignalResult lastSignal = signals[lastSignalIndex];
-        // Validate Signal
-        OrderInfoResult orderCalculated = signalToOrderInfo(symbol, lowTF, maCross.orderEnvironment, lastSignal);
-        orderCalculated = validateOrderDistance(symbol, lowTF, maCross.orderEnvironment, signals, lastSignalIndex);
-        if (lastSignal.maChangeShift >= 0 && lastSignal.maChangeShift <= 2 && orderCalculated.valid)
+        SignalResult signals[];
+        listSignals(signals, symbol, lowTF, maCross.orderEnvironment, firstAreaTouchShift);
+
+        int signalsCount = ArraySize(signals);
+        if (signalsCount > 0)
         {
-          // open signal
-          if (!orderCalculated.pending)
+          int lastSignalIndex = signalsCount - 1;
+          SignalResult lastSignal = signals[lastSignalIndex];
+          // Validate Signal
+          OrderInfoResult orderCalculated = signalToOrderInfo(symbol, lowTF, maCross.orderEnvironment, lastSignal);
+          orderCalculated = validateOrderDistance(symbol, lowTF, maCross.orderEnvironment, signals, lastSignalIndex);
+          if (lastSignal.maChangeShift >= 0 && lastSignal.maChangeShift <= 2 && orderCalculated.valid)
           {
+            // open signal
+            if (!orderCalculated.pending)
+            {
+              if (maCross.orderEnvironment == ENV_SELL)
+              {
+                orderCalculated = calculeOrderPlace(symbol, lowTF, maCross.orderEnvironment, 0, lastSignal.highestShift, MarketInfo(symbol, MODE_BID), false);
+                // orderCalculated.orderPrice = ;
+              }
+              else if (maCross.orderEnvironment == ENV_BUY)
+              {
+                // orderCalculated.orderPrice = MarketInfo(symbol, MODE_ASK);
+                orderCalculated = calculeOrderPlace(symbol, lowTF, maCross.orderEnvironment, 0, lastSignal.lowestShift, MarketInfo(symbol, MODE_ASK), false);
+              }
+              orderCalculated.pending = false;
+            }
+
+            if (trade && (allowedEnv == ENV_BOTH || allowedEnv == maCross.orderEnvironment))
+            {
+              Order(symbol, maCross.orderEnvironment, orderCalculated);
+              long chartId = findSymbolChart(symbol);
+              drawVLine(chartId, 0, "Order_" + IntegerToString(lastSignal.maChangeShift), clrOrange);
+              // breakPoint();
+            }
+
+            // Preparing the strategy result
             if (maCross.orderEnvironment == ENV_SELL)
             {
-              orderCalculated = calculeOrderPlace(symbol, lowTF, maCross.orderEnvironment, 0, lastSignal.highestShift, MarketInfo(symbol, MODE_BID), false);
-              // orderCalculated.orderPrice = ;
+              result.status = orderCalculated.pending == false ? STRATEGY_STATUS_IMMEDIATE_SELL : STRATEGY_STATUS_PENDING_SELL;
             }
             else if (maCross.orderEnvironment == ENV_BUY)
             {
-              // orderCalculated.orderPrice = MarketInfo(symbol, MODE_ASK);
-              orderCalculated = calculeOrderPlace(symbol, lowTF, maCross.orderEnvironment, 0, lastSignal.lowestShift, MarketInfo(symbol, MODE_ASK), false);
+              result.status = orderCalculated.pending == false ? STRATEGY_STATUS_IMMEDIATE_BUY : STRATEGY_STATUS_PENDING_BUY;
             }
-            orderCalculated.pending = false;
+
+            result.orderInfo = orderCalculated;
+            result.signal = lastSignal;
+
+            return result;
           }
-
-          Print("Is Pending = ", orderCalculated.pending);
-
-          Order(symbol, maCross.orderEnvironment, orderCalculated);
-
-          drawVLine(0, "Order_" + IntegerToString(lastSignal.maChangeShift), clrOrange);
-          // breakPoint();
         }
       }
     }
   }
+
+  return result;
 }
 
 HigherTFCrossCheckResult findHigherTimeFrameMACross(string symbol, ENUM_TIMEFRAMES higherTF)
@@ -213,16 +479,16 @@ HigherTFCrossCheckResult findHigherTimeFrameMACross(string symbol, ENUM_TIMEFRAM
     int actualShift = getShift(symbol, higherTF, i);
 
     if (actualShift < 0)
-      Print("Shift Error");
+      debug("Shift Error");
 
-    double MA5_current = getMA(symbol, higherTF, 5, actualShift);
-    double MA5_prev = getMA(symbol, higherTF, 5, actualShift + 1);
+    double MA5_current = getLibertyMA(symbol, 5, i);  // getMA(symbol, higherTF, 5, actualShift);
+    double MA5_prev = getLibertyMA(symbol, 5, i + 1); // getMA(symbol, higherTF, 5, actualShift + 1);
 
-    double MA10_current = getMA(symbol, higherTF, 10, actualShift);
-    double MA10_prev = getMA(symbol, higherTF, 10, actualShift + 1);
+    double MA10_current = getLibertyMA(symbol, 10, i);  // getMA(symbol, higherTF, 10, actualShift);
+    double MA10_prev = getLibertyMA(symbol, 10, i + 1); // getMA(symbol, higherTF, 10, actualShift + 1);
 
     // Only Current TimeFrame data
-    int higherTFBeginningInCurrentPeriod = i + (int)(higherTF / Period()) - 1;
+    int higherTFBeginningInCurrentPeriod = i; // i + (int)(higherTF / Period()) - 1;
     datetime currentShiftTime = iTime(symbol, PERIOD_CURRENT, higherTFBeginningInCurrentPeriod);
     double price = iOpen(symbol, PERIOD_CURRENT, higherTFBeginningInCurrentPeriod);
 
@@ -254,11 +520,11 @@ HigherTFCrossCheckResult findHigherTimeFrameMACross(string symbol, ENUM_TIMEFRAM
   // last validation
   if (result.found && Enable_MA_Closing)
   {
-    double MA5_current = iMA(symbol, higherTF, 5, 0, MODE_SMA, PRICE_CLOSE, 0); // getMA(symbol, higherTF, 5, 0);
-    double MA5_prev = iMA(symbol, higherTF, 5, 0, MODE_SMA, PRICE_CLOSE, 1);    // getMA(symbol, higherTF, 5, 1);
+    double MA5_current = getLibertyMA(symbol, 5, 0); // iMA(symbol, higherTF, 5, 0, MODE_SMA, PRICE_CLOSE, 0);
+    double MA5_prev = getLibertyMA(symbol, 5, 1);    // iMA(symbol, higherTF, 5, 0, MODE_SMA, PRICE_CLOSE, 1);
 
-    double MA10_current = iMA(symbol, higherTF, 10, 0, MODE_SMA, PRICE_CLOSE, 0); // getMA(symbol, higherTF, 10, 0);
-    double MA10_prev = iMA(symbol, higherTF, 10, 0, MODE_SMA, PRICE_CLOSE, 1);    // getMA(symbol, higherTF, 10, 1);
+    double MA10_current = getLibertyMA(symbol, 10, 0); // iMA(symbol, higherTF, 10, 0, MODE_SMA, PRICE_CLOSE, 0);
+    double MA10_prev = getLibertyMA(symbol, 10, 1);    // iMA(symbol, higherTF, 10, 0, MODE_SMA, PRICE_CLOSE, 1);
 
     const bool buyValidation = (MA5_current > MA10_current);
     const bool sellValidation = (MA5_current < MA10_current);
@@ -301,7 +567,7 @@ bool isAreaTouched(string symbol, ENUM_TIMEFRAMES higherTF, OrderEnvironment ord
 
   if (actualHigherShift >= 0)
   {
-    double h4_ma5 = getMA(symbol, higherTF, 5, actualHigherShift);
+    double h4_ma5 = getLibertyMA(symbol, 5, shift); // getMA(symbol, higherTF, 5, actualHigherShift);
     if (orderEnv == ENV_SELL)
     {
       double m5_high = iHigh(symbol, lower_tf, shift);
@@ -612,12 +878,14 @@ OrderInfoResult calculeOrderPlace(string symbol, ENUM_TIMEFRAMES tf, OrderEnviro
 
   double averageCandle = averageCandleSize(symbol, tf, signalShift, AverageCandleSizePeriod);
   double scaledCandleSize = averageCandle * AverageCandleSizeRatio;
-  // Print("scaledCandleSize = ", scaledCandleSize * (MathPow(10, _Digits - 1)), "  averageCandle = ", averageCandle * (MathPow(10, _Digits - 1)));
+  // debug("scaledCandleSize = ", scaledCandleSize * (MathPow(10, _Digits - 1)), "  averageCandle = ", averageCandle * (MathPow(10, _Digits - 1)));
 
   // double gapSizeInPoint = pipToPoint(symbol, StoplossGapInPip);
   double gapSizeInPoint = averageCandle * StopLossGapInAverageCandleSize;
 
   orderInfo.originalPrice = price;
+
+  orderInfo.averageCandleSize = averageCandle;
 
   if (orderEnv == ENV_SELL)
   {
@@ -666,12 +934,15 @@ OrderInfoResult signalToOrderInfo(string symbol, ENUM_TIMEFRAMES tf, OrderEnviro
 OrderInfoResult validateOrderDistance(string symbol, ENUM_TIMEFRAMES tf, OrderEnvironment orderEnv, SignalResult &signals[], int signalIndexToValidate)
 {
 
-  OrderInfoResult indexOrderInfo = signalToOrderInfo(symbol, tf, orderEnv, signals[signalIndexToValidate]);
+  SignalResult signal = signals[signalIndexToValidate];
+
+  OrderInfoResult indexOrderInfo = signalToOrderInfo(symbol, tf, orderEnv, signal);
 
   if (signalIndexToValidate > 0)
   {
     // Find highest/lowest entry price in the past
-    OrderInfoResult mostValidEntry = signalToOrderInfo(symbol, tf, orderEnv, signals[0]);
+    SignalResult mostValidEntrySignal = signals[0];
+    OrderInfoResult mostValidEntry = signalToOrderInfo(symbol, tf, orderEnv, mostValidEntrySignal);
     int place = 0;
     for (int i = 0; i < signalIndexToValidate; i++)
     {
@@ -680,11 +951,13 @@ OrderInfoResult validateOrderDistance(string symbol, ENUM_TIMEFRAMES tf, OrderEn
 
       if (orderEnv == ENV_SELL && signalOrderInfo.originalPrice > mostValidEntry.originalPrice)
       {
+        mostValidEntrySignal = item;
         mostValidEntry = signalOrderInfo;
         place = i;
       }
       else if (orderEnv == ENV_BUY && signalOrderInfo.originalPrice < mostValidEntry.originalPrice)
       {
+        mostValidEntrySignal = item;
         mostValidEntry = signalOrderInfo;
         place = i;
       }
@@ -692,7 +965,21 @@ OrderInfoResult validateOrderDistance(string symbol, ENUM_TIMEFRAMES tf, OrderEn
 
     if (mostValidEntry.orderPrice > -1)
     {
-      bool isValidPriceDistance = (orderEnv == ENV_SELL && indexOrderInfo.originalPrice > mostValidEntry.tpPrice) || (orderEnv == ENV_BUY && indexOrderInfo.originalPrice < mostValidEntry.tpPrice);
+      bool isValidPriceDistance = true;
+      int candlesCountFromMostValidEntry = MathAbs(mostValidEntrySignal.maChangeShift - signal.maChangeShift);
+
+      if (orderEnv == ENV_SELL)
+      {
+        int lowestCandleFromMostValid = iLowest(symbol, tf, MODE_LOW, candlesCountFromMostValidEntry, signal.maChangeShift);
+        double lowestPrice = iLow(symbol, tf, lowestCandleFromMostValid);
+        isValidPriceDistance = (indexOrderInfo.originalPrice > mostValidEntry.tpPrice) && (lowestPrice > mostValidEntry.tpPrice);
+      }
+      else if (orderEnv == ENV_BUY)
+      {
+        int highestCandleFromMostValid = iHighest(symbol, tf, MODE_HIGH, candlesCountFromMostValidEntry, signal.maChangeShift);
+        double highestPrice = iLow(symbol, tf, highestCandleFromMostValid);
+        isValidPriceDistance = (indexOrderInfo.originalPrice < mostValidEntry.tpPrice) && (highestPrice < mostValidEntry.tpPrice);
+      }
 
       // if (signalIndexToValidate == ActiveSignalForTest)
       // {
@@ -701,7 +988,7 @@ OrderInfoResult validateOrderDistance(string symbol, ENUM_TIMEFRAMES tf, OrderEn
 
       //   SignalResult sg = signals[signalIndexToValidate];
       //   drawHLine(mostValidEntry.orderPrice, "orderPrice" + IntegerToString(sg.maChangeShift), C'226,195,43');
-      //   Print("Order Price = ", indexOrderInfo.orderPrice, " mostTP = ", mostValidEntry.tpPrice, " isValidPriceDistance = ", isValidPriceDistance);
+      //   debug("Order Price = ", indexOrderInfo.orderPrice, " mostTP = ", mostValidEntry.tpPrice, " isValidPriceDistance = ", isValidPriceDistance);
       // }
 
       // If it is in a valid distance to first entry we will consider that entry as a pending order and replace with current one
@@ -770,6 +1057,8 @@ int getShift(string symbol, ENUM_TIMEFRAMES timeframe, int shift)
 
   return actualShift;
 }
+
+/////////////////////////// Order Helpers ///////////////////////////
 
 double pipToPoint(string symbol, double pipValue)
 {
@@ -846,7 +1135,7 @@ int Order(string symbol, OrderEnvironment orderEnv, OrderInfoResult &orderInfo, 
       Green);
 }
 
-bool proccessOrders(string symbol, datetime crossTime)
+bool canCheckForSignals(string symbol, HigherTFCrossCheckResult &maCross)
 {
   int total = OrdersTotal();
   for (int pos = 0; pos < total; pos++)
@@ -854,13 +1143,19 @@ bool proccessOrders(string symbol, datetime crossTime)
     if (OrderSelect(pos, SELECT_BY_POS) == false)
       continue;
 
-    if (symbol == OrderSymbol())
+    if (symbol == OrderSymbol() && OrderMagicNumber() == MagicNumber)
     {
       int orderTime = (int)OrderOpenTime();
-      int cross_Time = (int)crossTime;
-      if (orderTime < cross_Time)
+      int cross_Time = (int)maCross.crossTime;
+
+      // Environment avaz shode ?
+      int OP = OrderType();
+
+      bool orderTypeDifferentThanCrossEnv = maCross.orderEnvironment == ENV_BUY && (OP == OP_SELL || OP == OP_SELLSTOP || OP == OP_SELLLIMIT);
+      orderTypeDifferentThanCrossEnv = orderTypeDifferentThanCrossEnv || (maCross.orderEnvironment == ENV_SELL && (OP == OP_BUY || OP == OP_BUYSTOP || OP == OP_BUYLIMIT));
+
+      if (orderTime < cross_Time || orderTypeDifferentThanCrossEnv)
       {
-        int OP = OrderType();
         if (OP == OP_BUY || OP == OP_SELL)
         {
           OrderClose(
@@ -877,6 +1172,8 @@ bool proccessOrders(string symbol, datetime crossTime)
           OrderDelete(OrderTicket(), clrAzure);
         }
 
+        debug("Deleting Order Due To Change Of Environment " + symbol);
+
         return true;
       }
 
@@ -884,13 +1181,50 @@ bool proccessOrders(string symbol, datetime crossTime)
       {
         checkForBreakEven(symbol, pos);
       }
-
+      // debug("Has Open order " + symbol);
+      // Symbol dar liste ordere baz peyda shode, banabarin az checke signale jadid jelogiri mikonim
       return false;
     }
     // FileWrite(handle, OrderTicket(), OrderOpenPrice(), OrderOpenTime(), OrderSymbol(), OrderLots());
   }
 
+  if (symbolHasProfitInCurrentCrossing(symbol, (int)maCross.crossTime))
+  {
+    // debug("Has profit in current crossing " + symbol);
+    return false;
+  }
+
+  return true;
+}
+
+/////////////////////////// Order Management Helpers ///////////////////////////
+void processEAOrders()
+{
+
+  int total = OrdersTotal();
+  for (int pos = 0; pos < total; pos++)
+  {
+    if (OrderSelect(pos, SELECT_BY_POS) == false)
+      continue;
+
+    if (deletePendingIfExceededTPThreshold())
+      continue;
+
+    if (EnableBreakEven)
+    {
+      checkForBreakEven(OrderSymbol(), pos);
+    }
+    // FileWrite(handle, OrderTicket(), OrderOpenPrice(), OrderOpenTime(), OrderSymbol(), OrderLots());
+  }
+
+  syncActiveSymbolOrders();
+}
+
+int selectLastHistoryOrderTicketFor(string symbol)
+{
   int i, hstTotal = OrdersHistoryTotal();
+  int lastTicket = -1;
+  int lastFoundOrderTime = -1;
   for (i = 0; i < hstTotal; i++)
   {
     //---- check selection result
@@ -899,20 +1233,90 @@ bool proccessOrders(string symbol, datetime crossTime)
       continue;
     }
 
-    if (symbol == OrderSymbol())
+    if (symbol == OrderSymbol() && OrderMagicNumber() == MagicNumber)
     {
       int orderTime = (int)OrderOpenTime();
-      int cross_Time = (int)crossTime;
-      // Already made profit in the current crossing session
-      bool hadProfit = OrderProfit() >= 0; // OrderClosePrice() >= OrderTakeProfit();
-      if (orderTime > cross_Time && hadProfit)
+      if (orderTime > lastFoundOrderTime)
       {
-        return false;
+        lastTicket = OrderTicket();
+        lastFoundOrderTime = orderTime;
       }
     }
   }
 
-  return true;
+  return lastTicket;
+}
+
+bool symbolHasProfitInCurrentCrossing(string symbol, int crossTime = -1)
+{
+  int lastHistoryOrderTicket = selectLastHistoryOrderTicketFor(symbol);
+
+  if ((int)crossTime == -1)
+  {
+    HigherTFCrossCheckResult maCross = findHigherTimeFrameMACross(symbol, higher_timeframe);
+    if (maCross.found)
+    {
+      crossTime = (int)maCross.crossTime;
+    }
+  }
+
+  if ((int)crossTime > -1)
+  {
+    if (lastHistoryOrderTicket > -1 && OrderSelect(lastHistoryOrderTicket, SELECT_BY_TICKET, MODE_HISTORY) == true)
+    {
+      if (symbol == OrderSymbol() && OrderMagicNumber() == MagicNumber && !isOpPending(OrderType()))
+      {
+        bool hadProfit = OrderProfit() >= 0; // OrderClosePrice() >= OrderTakeProfit();
+        if (hadProfit)
+        {
+          // Sessione jadid baraye symbole profit dar
+          // bar asase crossinge jadid khahad bud
+          int orderTime = (int)OrderOpenTime();
+          int cross_Time = (int)crossTime;
+          // Already made profit in the current crossing session
+
+          bool orderHappenedAfterCrossing = orderTime > cross_Time;
+
+          return orderHappenedAfterCrossing;
+
+          // if (SingleChart)
+          // {
+          //   return orderHappenedAfterCrossing;
+          // }
+          // else
+          // {
+          //   int orderSession = getSessionNumber(OrderOpenTime());
+          //   int currentSession = getSessionNumber(TimeCurrent());
+
+          //   // Agar single chart nabud sessione jadid baraye symbole profit dar
+          //   // Zamani ast ke sessione trade ba sessione alan barabar nabashad
+          //   bool orderHappenedAfterCrossingAndInCurrentSession = orderHappenedAfterCrossing && sessionsEqual(orderSession, currentSession);
+
+          //   return orderHappenedAfterCrossingAndInCurrentSession;
+          // }
+        }
+      }
+    }
+  }
+
+  return false;
+}
+
+int selectOpenOrderTicketFor(string symbol)
+{
+  int total = OrdersTotal();
+  for (int pos = 0; pos < total; pos++)
+  {
+    if (OrderSelect(pos, SELECT_BY_POS) == false)
+      continue;
+
+    if (symbol == OrderSymbol() && OrderMagicNumber() == MagicNumber)
+    {
+      return OrderTicket();
+    }
+  }
+
+  return -1;
 }
 
 void checkForBreakEven(string symbol, int orderIndex)
@@ -962,10 +1366,401 @@ void checkForBreakEven(string symbol, int orderIndex)
         clrAqua            // color
     );
 
-    Print("======================== Breakeven applied==========");
+    debug("============ Breakeven applied(" + symbol + ") ============");
 
     // breakPoint();
   }
+}
+
+void initializeGroups()
+{
+  debug("==========================");
+  GROUPS_LENGTH = ArraySize(GROUPS_STR);
+
+  if (StringLen(CustomGroup1) > 0)
+  {
+    GROUPS_LENGTH++;
+    ArrayResize(GROUPS_STR, GROUPS_LENGTH);
+    GROUPS_STR[GROUPS_LENGTH - 1] = CustomGroup1;
+  }
+
+  if (StringLen(CustomGroup2) > 0)
+  {
+    GROUPS_LENGTH++;
+    ArrayResize(GROUPS_STR, GROUPS_LENGTH);
+    GROUPS_STR[GROUPS_LENGTH - 1] = CustomGroup2;
+  }
+
+  ArrayResize(GROUPS, GROUPS_LENGTH);
+  for (int i = 0; i < GROUPS_LENGTH; i++)
+  {
+    string symbolsStr = GROUPS_STR[i];
+    GroupStruct group;
+    StringSplit(symbolsStr, SYMBOL_SEPARATOR, group.symbols);
+    group.symbols_count = ArraySize(group.symbols);
+
+    ArrayResize(group.bars, group.symbols_count);
+    ArrayFill(group.bars, 0, group.symbols_count, 0);
+
+    ArrayResize(group.MA10, group.symbols_count);
+    ArrayResize(group.MA5, group.symbols_count);
+
+    // Check mikonim agar zamane baz shodane EA orderhaye bazi dashtim ke marboot be symbol bud
+    // An symbol ra be onvane active symbole marboot be group set mikonim
+    for (int symIndex = 0; symIndex < group.symbols_count; symIndex++)
+    {
+      string sym = group.symbols[symIndex];
+      int ticket = selectOpenOrderTicketFor(sym);
+      if (ticket > -1 && OrderSelect(ticket, SELECT_BY_TICKET) == true && sym == OrderSymbol() && OrderMagicNumber() == MagicNumber)
+      {
+        int orderSession = getSessionNumber(OrderOpenTime());
+        int currentSession = getSessionNumber(TimeCurrent());
+        if (sessionsEqual(orderSession, currentSession))
+        {
+          int OP = OrderType();
+          if (OP == OP_SELL || OP == OP_SELLLIMIT || OP == OP_SELLSTOP)
+          {
+            group.active_symbol_sell = sym;
+            StrategyResult sr;
+            sr.symbol = sym;
+            group.active_strategy_sell = sr;
+          }
+          else if (OP == OP_BUY || OP == OP_BUYLIMIT || OP == OP_BUYSTOP)
+          {
+            group.active_symbol_buy = sym;
+            StrategyResult sr;
+            sr.symbol = sym;
+            group.active_strategy_buy = sr;
+          }
+          debug(" Has Open order " + sym);
+          break;
+        }
+      }
+
+      if (symbolHasProfitInCurrentCrossing(sym))
+      {
+        int orderSession = getSessionNumber(OrderOpenTime());
+        int currentSession = getSessionNumber(TimeCurrent());
+
+        if (sessionsEqual(orderSession, currentSession))
+        {
+          int OP = OrderType();
+          if (OP == OP_SELL || OP == OP_SELLLIMIT || OP == OP_SELLSTOP)
+          {
+            group.active_symbol_sell = sym;
+          }
+          else if (OP == OP_BUY || OP == OP_BUYLIMIT || OP == OP_BUYSTOP)
+          {
+            group.active_symbol_buy = sym;
+          }
+          debug(" Had Profit " + sym);
+          break;
+        }
+      }
+    }
+
+    GROUPS[i] = group;
+  }
+
+  debug("==========================");
+}
+
+void initializeMAs()
+{
+  for (int groupIdx = 0; groupIdx < GROUPS_LENGTH; groupIdx++)
+  {
+
+    GroupStruct group = GROUPS[groupIdx];
+
+    for (int symbolIdx = 0; symbolIdx < group.symbols_count; symbolIdx++)
+    {
+      string symbol = group.symbols[symbolIdx];
+
+      // iMA(symbol, higherTF, 5, 0, MODE_SMA, PRICE_CLOSE, 0);
+      MA_Array maArr = group.MA5[symbolIdx];
+      initLibertyMA(maArr.MA, symbol, higher_timeframe, 5, MODE_SMA, PRICE_CLOSE);
+      group.MA5[symbolIdx] = maArr;
+
+      maArr = group.MA10[symbolIdx];
+      initLibertyMA(maArr.MA, symbol, higher_timeframe, 10, MODE_SMA, PRICE_CLOSE);
+      group.MA10[symbolIdx] = maArr;
+    }
+
+    GROUPS[groupIdx] = group;
+  }
+}
+
+double getLibertyMA(string symbol, int period, int shift)
+{
+
+  for (int groupIdx = 0; groupIdx < GROUPS_LENGTH; groupIdx++)
+  {
+
+    GroupStruct group = GROUPS[groupIdx];
+
+    for (int symbolIdx = 0; symbolIdx < group.symbols_count; symbolIdx++)
+    {
+      string sym = group.symbols[symbolIdx];
+      if (symbol == sym && iBars(sym, lower_timeframe) > 0)
+      {
+        switch (period)
+        {
+        case 5:
+          return group.MA5[symbolIdx].MA[shift];
+          break;
+        case 10:
+          return group.MA10[symbolIdx].MA[shift];
+          break;
+
+        default:
+          return EMPTY_VALUE;
+        }
+      }
+    }
+  }
+
+  return EMPTY_VALUE;
+}
+
+bool isOpPending(int op)
+{
+  return op == OP_SELLLIMIT || op == OP_BUYLIMIT || op == OP_SELLSTOP || op == OP_BUYSTOP;
+}
+
+bool deletePendingIfExceededTPThreshold()
+{
+  string symbol = OrderSymbol();
+  int OP = OrderType();
+  double TP = OrderTakeProfit();
+  double ask = MarketInfo(symbol, MODE_ASK);
+
+  bool typeSell = OP == OP_SELLLIMIT || OP == OP_SELLSTOP;
+  bool typeBuy = OP == OP_BUYLIMIT || OP == OP_BUYSTOP;
+
+  bool shouldDelete = false;
+
+  if (typeSell)
+  {
+    shouldDelete = ask <= TP;
+  }
+  else if (typeBuy)
+  {
+    shouldDelete = ask >= TP;
+  }
+
+  bool couldDelete = false;
+
+  if (shouldDelete)
+  {
+    couldDelete = OrderDelete(OrderTicket(), clrAzure);
+    if (couldDelete)
+    {
+      debug("Pending Exceeded TP Threshold: Deleted Pending For " + symbol);
+    }
+    else
+    {
+      debug("Pending Exceeded TP Threshold: Could not delete pending for " + symbol);
+    }
+  }
+
+  return couldDelete;
+}
+
+void syncActiveSymbolOrders()
+{
+  for (int groupIdx = 0; groupIdx < GROUPS_LENGTH; groupIdx++)
+  {
+    GroupStruct group = GROUPS[groupIdx];
+
+    if (group.active_symbol_buy != "" && hasActiveTransaction(group.active_symbol_buy) == false)
+    {
+      debug("Active Symbol Cleard For Expired Pending " + group.active_symbol_buy);
+      group.active_symbol_buy = "";
+      StrategyResult sr;
+      group.active_strategy_buy = sr;
+    }
+
+    if (group.active_symbol_sell != "" && hasActiveTransaction(group.active_symbol_sell) == false)
+    {
+      debug("Active Symbol Cleard For Expired Pending " + group.active_symbol_sell);
+      group.active_symbol_sell = "";
+      StrategyResult sr;
+      group.active_strategy_sell = sr;
+    }
+
+    GROUPS[groupIdx] = group;
+  }
+}
+
+bool hasActiveTransaction(string symbol)
+{
+  if (StringLen(symbol) > 0)
+  {
+    int ticket = selectOpenOrderTicketFor(symbol);
+    // Has open order
+    if (ticket > -1)
+    {
+      return true;
+    }
+
+    // Has profit
+    if (symbolHasProfitInCurrentCrossing(symbol))
+    {
+      return true;
+    }
+  }
+
+  return false;
+}
+/////////////////////////// Time & Session Helpers ///////////////////////////
+bool TimeFilter(int start_time, int end_time)
+{
+  int CurrentHour = TimeHour(TimeCurrent());
+
+  start_time = start_time + (GMTOffset);
+  end_time = end_time + (GMTOffset);
+
+  if (start_time > end_time)
+  {
+    if (CurrentHour < start_time && CurrentHour >= end_time)
+    {
+      return false;
+    }
+    else
+    {
+      return true;
+    }
+  }
+  else
+  {
+    if (CurrentHour >= start_time && CurrentHour < end_time)
+    {
+      return true;
+    }
+    else
+    {
+      return false;
+    }
+  }
+}
+
+bool minutesPassed()
+{
+  int currentTime = (int)TimeLocal();
+  int timePassed = (currentTime - minuteTimer) / 60;
+
+  if (timePassed >= 1)
+  {
+    minuteTimer = (int)TimeLocal();
+
+    return true;
+  }
+
+  return false;
+}
+
+bool isInSession(int sessionNumber, datetime time)
+{
+  if (TimeDay(TimeLocal()) == TimeDay(time))
+  {
+    int timeHour = TimeHour(time);
+
+    int start_time = -1, end_time = -1;
+
+    switch (sessionNumber)
+    {
+    case 1:
+      start_time = SessionStart1 + (GMTOffset);
+      end_time = SessionEnd1 + (GMTOffset);
+      break;
+
+    case 2:
+      start_time = SessionStart2 + (GMTOffset);
+      end_time = SessionEnd2 + (GMTOffset);
+      break;
+
+    case 3:
+      start_time = SessionStart3 + (GMTOffset);
+      end_time = SessionEnd3 + (GMTOffset);
+      break;
+
+    default:
+      break;
+    }
+
+    if (timeHour >= start_time && timeHour <= end_time)
+    {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+int getSessionNumber(datetime time)
+{
+  if (TimeDay(TimeLocal()) == TimeDay(time))
+  {
+    int timeHour = TimeHour(time);
+    int start_time = -1, end_time = -1;
+
+    start_time = SessionStart1 + (GMTOffset);
+    end_time = SessionEnd1 + (GMTOffset);
+
+    if (timeHour >= start_time && timeHour <= end_time)
+    {
+      return 1;
+    }
+
+    start_time = SessionStart2 + (GMTOffset);
+    end_time = SessionEnd2 + (GMTOffset);
+
+    if (timeHour >= start_time && timeHour <= end_time)
+    {
+      return 2;
+    }
+
+    start_time = SessionStart3 + (GMTOffset);
+    end_time = SessionEnd3 + (GMTOffset);
+
+    if (timeHour >= start_time && timeHour <= end_time)
+    {
+      return 3;
+    }
+  }
+
+  return -1;
+}
+
+bool isTradingEnabledIn(int session)
+{
+  switch (session)
+  {
+  case 1:
+    return EnableTradingSession1;
+    break;
+  case 2:
+    return EnableTradingSession2;
+    break;
+  case 3:
+    return EnableTradingSession3;
+    break;
+
+  default:
+    break;
+  }
+
+  return false;
+}
+
+bool isTradingEnabledInCurrentSession()
+{
+  return isTradingEnabledIn(getSessionNumber(TimeCurrent()));
+}
+
+bool sessionsEqual(int session1, int session2)
+{
+  return session1 == session2 && session1 > -1 && session2 > -1;
 }
 
 //+------------------------------------------------------------------+
@@ -988,69 +1783,88 @@ void drawCross(datetime time, double price)
   //  }
 }
 
-void drawVLine(int shift, string id = "", double clr = clrAqua)
+void drawVLine(long chartId, int shift, string id = "", int clr = clrAqua)
 {
-  datetime time = iTime(_Symbol, PERIOD_CURRENT, shift);
-  double price = iOpen(_Symbol, PERIOD_CURRENT, shift);
+  string symbol = ChartSymbol(chartId);
+  datetime time = iTime(symbol, PERIOD_CURRENT, shift);
+  double price = iOpen(symbol, PERIOD_CURRENT, shift);
 
-  string id2 = "liberty_v_" + id;
+  string id2 = "liberty_v_" + IntegerToString(chartId) + "_" + id;
 
   // ObjectDelete(id2);
-  ObjectCreate(id2, OBJ_VLINE, 0, time, price);
-  ObjectSet(id2, OBJPROP_COLOR, clr);
+  ObjectCreate(chartId, id2, OBJ_VLINE, 0, time, price);
+  ObjectSetInteger(chartId, id2, OBJPROP_COLOR, clr);
 }
 
-void drawHLine(double price, string id = "", double clr = clrAqua)
+void drawHLine(long chartId, double price, string id = "", int clr = clrAqua)
 {
-  datetime time = iTime(_Symbol, PERIOD_CURRENT, 0);
+  string symbol = ChartSymbol(chartId);
+  datetime time = iTime(symbol, PERIOD_CURRENT, 0);
 
-  string id2 = "liberty_h_" + id;
+  string id2 = "liberty_h_" + IntegerToString(chartId) + "_" + id;
 
   // ObjectDelete(id2);
-  ObjectCreate(id2, OBJ_HLINE, 0, time, price);
-  ObjectSet(id2, OBJPROP_COLOR, clr);
+  ObjectCreate(chartId, id2, OBJ_HLINE, 0, time, price);
+  ObjectSetInteger(chartId, id2, OBJPROP_COLOR, clr);
 }
 
-void drawArrowObj(int shift, bool up = true, string id = "", double clr = clrAqua)
+void drawArrowObj(long chartId, int shift, bool up = true, string id = "", int clr = clrAqua)
 {
-  datetime time = iTime(_Symbol, PERIOD_CURRENT, shift);
-  double price = up ? iLow(_Symbol, PERIOD_CURRENT, shift) : iHigh(_Symbol, PERIOD_CURRENT, shift);
+  string symbol = ChartSymbol(chartId);
+  datetime time = iTime(symbol, PERIOD_CURRENT, shift);
+  double price = up ? iLow(symbol, PERIOD_CURRENT, shift) : iHigh(symbol, PERIOD_CURRENT, shift);
   const double increment = Point() * 100;
   price = up ? price - increment : price + increment;
   int obj = up ? OBJ_ARROW_UP : OBJ_ARROW_DOWN;
 
-  string id2 = "liberty_arrow_" + id;
+  string id2 = "liberty_arrow_" + IntegerToString(chartId) + "_" + id;
 
   // ObjectDelete(id2);
-  ObjectCreate(id2, obj, 0, time, price);
-  ObjectSet(id2, OBJPROP_COLOR, clr);
-  ObjectSetInteger(0, id2, OBJPROP_WIDTH, 5);
+  ObjectCreate(chartId, id2, obj, 0, time, price);
+  ObjectSetInteger(chartId, id2, OBJPROP_COLOR, clr);
+  ObjectSetInteger(chartId, id2, OBJPROP_WIDTH, 5);
 }
 
-void drawValidationObj(int shift, bool up = true, bool valid = true, string id = "", double clr = C'9,255,9')
+void drawValidationObj(long chartId, int shift, bool up = true, bool valid = true, string id = "", int clr = C'9,255,9')
 {
-  datetime time = iTime(_Symbol, PERIOD_CURRENT, shift);
-  double price = up ? iLow(_Symbol, PERIOD_CURRENT, shift) : iHigh(_Symbol, PERIOD_CURRENT, shift);
+  string symbol = ChartSymbol(chartId);
+  datetime time = iTime(symbol, PERIOD_CURRENT, shift);
+  double price = up ? iLow(symbol, PERIOD_CURRENT, shift) : iHigh(symbol, PERIOD_CURRENT, shift);
   const double increment = Point() * 200;
   price = up ? price - increment : price + increment;
   int obj = valid ? OBJ_ARROW_CHECK : OBJ_ARROW_STOP;
 
-  string id2 = "liberty_validation_" + id;
+  string id2 = "liberty_validation_" + IntegerToString(chartId) + "_" + id;
 
   // ObjectDelete(id2);
-  ObjectCreate(id2, obj, 0, time, price);
-  ObjectSet(id2, OBJPROP_COLOR, clr);
-  ObjectSetInteger(0, id2, OBJPROP_WIDTH, 5);
+  ObjectCreate(chartId, id2, obj, 0, time, price);
+  ObjectSetInteger(chartId, id2, OBJPROP_COLOR, clr);
+  ObjectSetInteger(chartId, id2, OBJPROP_WIDTH, 5);
 }
 
+long findSymbolChart(string symbol)
+{
+  long chartId = ChartFirst();
+
+  while (chartId > 0)
+  {
+    if (ChartSymbol(chartId) == symbol)
+    {
+      return chartId;
+    }
+    chartId = ChartNext(chartId);
+  }
+
+  return -1;
+}
 //+------------------------------------------------------------------+
 
-void deleteObjectsAll()
+void deleteObjectsAll(long chartId)
 {
-  ObjectsDeleteAll(0, "liberty_arrow_");
-  ObjectsDeleteAll(0, "liberty_v_");
-  ObjectsDeleteAll(0, "liberty_h_");
-  ObjectsDeleteAll(0, "liberty_validation_");
+  ObjectsDeleteAll(chartId, "liberty_arrow_", 0);
+  ObjectsDeleteAll(chartId, "liberty_v_", 0);
+  ObjectsDeleteAll(chartId, "liberty_h_", 0);
+  ObjectsDeleteAll(chartId, "liberty_validation_", 0);
   // ObjectsDeleteAll(0, OBJ_ARROW_DOWN);
 }
 //+------------------------------------------------------------------+
@@ -1066,62 +1880,101 @@ void breakPoint()
   }
 }
 
-void simulate(string symbol, ENUM_TIMEFRAMES tf, HigherTFCrossCheckResult &maCross, int firstAreaTouchShift, SignalResult &signals[])
+void simulate(string symbol, ENUM_TIMEFRAMES low_tf)
 {
-  deleteObjectsAll();
-  int listSize = ArraySize(signals);
-  for (int i = 0; i < listSize; i++)
+  if (EnableSimulation)
   {
-    SignalResult item = signals[i];
 
-    OrderInfoResult orderCalculated;
-
-    double hsColor = C'60,167,17';
-    double lsColor = C'249,0,0';
-    double orderColor = clrAqua;
-    double depthOfMoveColor = C'207,0,249';
-
-    const int active = ActiveSignalForTest;
-
-    if (i == active)
+    if (symbol != "")
     {
-      lsColor = C'255,230,6';
-      orderColor = clrGreen;
-      depthOfMoveColor = C'249,0,0';
-      drawVLine(item.maChangeShift, IntegerToString(item.maChangeShift) + "test", orderColor);
-    }
+      long chartId = findSymbolChart(symbol);
+      if (chartId > 0)
+      {
 
-    // drawVLine(item.moveDepthShift, IntegerToString(item.moveDepthShift), depthOfMoveColor);
+        HigherTFCrossCheckResult maCross = findHigherTimeFrameMACross(symbol, higher_timeframe);
+        if (maCross.found)
+        {
+          deleteObjectsAll(chartId);
+          drawVLine(chartId, maCross.crossCandleShift, "Order_" + IntegerToString(maCross.crossCandleShift), clrBlanchedAlmond);
 
-    if (maCross.orderEnvironment == ENV_SELL && item.highestShift > -1)
-    {
-      // drawArrowObj(item.highestShift, false, IntegerToString(item.highestShift), hsColor);
+          int firstAreaTouchShift = findAreaTouch(symbol, higher_timeframe, maCross.orderEnvironment, maCross.crossCandleShift, PERIOD_CURRENT);
 
-      double virtualPrice = iLow(_Symbol, PERIOD_CURRENT, item.maChangeShift);
-      orderCalculated = calculeOrderPlace(_Symbol, PERIOD_CURRENT, maCross.orderEnvironment, item.maChangeShift, item.highestShift, virtualPrice);
-    }
-    else if (maCross.orderEnvironment == ENV_BUY && item.lowestShift > -1)
-    {
-      // drawArrowObj(item.lowestShift, true, IntegerToString(item.lowestShift), lsColor);
+          if (firstAreaTouchShift > 0 && maCross.orderEnvironment != ENV_NONE)
+          {
 
-      double virtualPrice = iHigh(_Symbol, PERIOD_CURRENT, item.maChangeShift);
-      orderCalculated = calculeOrderPlace(_Symbol, PERIOD_CURRENT, maCross.orderEnvironment, item.maChangeShift, item.lowestShift, virtualPrice);
-    }
+            SignalResult signals[];
+            listSignals(signals, symbol, low_tf, maCross.orderEnvironment, firstAreaTouchShift);
 
-    drawArrowObj(item.maChangeShift, maCross.orderEnvironment == ENV_BUY, IntegerToString(item.maChangeShift), orderColor);
+            int listSize = ArraySize(signals);
+            for (int i = 0; i < listSize; i++)
+            {
+              SignalResult item = signals[i];
 
-    // drawVLine(item.lowestShift, IntegerToString(item.lowestShift), C'207,249,0');
+              OrderInfoResult orderCalculated;
 
-    orderCalculated = validateOrderDistance(_Symbol, PERIOD_CURRENT, maCross.orderEnvironment, signals, i);
+              double hsColor = C'60,167,17';
+              double lsColor = C'249,0,0';
+              int orderColor = clrAqua;
+              double depthOfMoveColor = C'207,0,249';
 
-    drawValidationObj(item.maChangeShift, maCross.orderEnvironment == ENV_BUY, orderCalculated.valid, IntegerToString(item.maChangeShift), orderCalculated.valid ? C'9,255,9' : C'249,92,92');
+              const int active = ActiveSignalForTest;
 
-    if (i == active)
-    {
-      string id = IntegerToString(i);
-      drawHLine(orderCalculated.orderPrice, "_order_" + id, orderCalculated.pending ? C'245,46,219' : C'0,191,73');
-      drawHLine(orderCalculated.slPrice, "_sl_" + id, C'255,5,5');
-      drawHLine(orderCalculated.tpPrice, "_tp_" + id, C'0,119,255');
+              if (i == active)
+              {
+                lsColor = C'255,230,6';
+                orderColor = clrGreen;
+                depthOfMoveColor = C'249,0,0';
+                drawVLine(chartId, item.maChangeShift, IntegerToString(item.maChangeShift) + "test", orderColor);
+              }
+
+              // drawVLine(item.moveDepthShift, IntegerToString(item.moveDepthShift), depthOfMoveColor);
+
+              if (maCross.orderEnvironment == ENV_SELL && item.highestShift > -1)
+              {
+                // drawArrowObj(item.highestShift, false, IntegerToString(item.highestShift), hsColor);
+
+                double virtualPrice = iLow(symbol, low_tf, item.maChangeShift);
+                orderCalculated = calculeOrderPlace(symbol, low_tf, maCross.orderEnvironment, item.maChangeShift, item.highestShift, virtualPrice);
+              }
+              else if (maCross.orderEnvironment == ENV_BUY && item.lowestShift > -1)
+              {
+                // drawArrowObj(item.lowestShift, true, IntegerToString(item.lowestShift), lsColor);
+
+                double virtualPrice = iHigh(symbol, low_tf, item.maChangeShift);
+                orderCalculated = calculeOrderPlace(symbol, low_tf, maCross.orderEnvironment, item.maChangeShift, item.lowestShift, virtualPrice);
+              }
+
+              drawArrowObj(chartId, item.maChangeShift, maCross.orderEnvironment == ENV_BUY, IntegerToString(item.maChangeShift), orderColor);
+
+              // drawVLine(item.lowestShift, IntegerToString(item.lowestShift), C'207,249,0');
+
+              orderCalculated = validateOrderDistance(symbol, low_tf, maCross.orderEnvironment, signals, i);
+
+              drawValidationObj(chartId, item.maChangeShift, maCross.orderEnvironment == ENV_BUY, orderCalculated.valid, IntegerToString(item.maChangeShift), orderCalculated.valid ? C'9,255,9' : C'249,92,92');
+
+              if (i == active && ShowTP_SL)
+              {
+                string id = IntegerToString(i);
+                drawHLine(chartId, orderCalculated.orderPrice, "_order_" + id, orderCalculated.pending ? C'245,46,219' : C'0,191,73');
+                drawHLine(chartId, orderCalculated.slPrice, "_sl_" + id, C'255,5,5');
+                drawHLine(chartId, orderCalculated.tpPrice, "_tp_" + id, C'0,119,255');
+              }
+            }
+          }
+        }
+      }
     }
   }
+  else if (ClearObjects)
+  {
+    long chartId = findSymbolChart(symbol);
+    deleteObjectsAll(chartId);
+  }
+}
+
+void debug(string msg)
+{
+  Alert(msg);
+  Print(msg);
+  SendNotification(msg);
 }
