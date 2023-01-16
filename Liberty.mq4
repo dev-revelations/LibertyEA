@@ -1375,26 +1375,31 @@ void checkForBreakEven(string symbol, int orderIndex)
 void initializeGroups()
 {
   debug("==========================");
+  string groups_str_copy[];
   GROUPS_LENGTH = ArraySize(GROUPS_STR);
+
+  ArrayResize(groups_str_copy, GROUPS_LENGTH);
+  ArrayCopy(groups_str_copy, GROUPS_STR, 0, 0, GROUPS_LENGTH);
+  
 
   if (StringLen(CustomGroup1) > 0)
   {
     GROUPS_LENGTH++;
-    ArrayResize(GROUPS_STR, GROUPS_LENGTH);
-    GROUPS_STR[GROUPS_LENGTH - 1] = CustomGroup1;
+    ArrayResize(groups_str_copy, GROUPS_LENGTH);
+    groups_str_copy[GROUPS_LENGTH - 1] = CustomGroup1;
   }
 
   if (StringLen(CustomGroup2) > 0)
   {
     GROUPS_LENGTH++;
-    ArrayResize(GROUPS_STR, GROUPS_LENGTH);
-    GROUPS_STR[GROUPS_LENGTH - 1] = CustomGroup2;
+    ArrayResize(groups_str_copy, GROUPS_LENGTH);
+    groups_str_copy[GROUPS_LENGTH - 1] = CustomGroup2;
   }
 
   ArrayResize(GROUPS, GROUPS_LENGTH);
   for (int i = 0; i < GROUPS_LENGTH; i++)
   {
-    string symbolsStr = GROUPS_STR[i];
+    string symbolsStr = groups_str_copy[i];
     GroupStruct group;
     StringSplit(symbolsStr, SYMBOL_SEPARATOR, group.symbols);
     group.symbols_count = ArraySize(group.symbols);
