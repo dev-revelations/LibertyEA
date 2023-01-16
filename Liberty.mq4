@@ -473,7 +473,11 @@ HigherTFCrossCheckResult findHigherTimeFrameMACross(string symbol, ENUM_TIMEFRAM
   result.found = false;
   result.orderEnvironment = ENV_NONE;
 
-  for (int i = 0; i < Bars - 1; i++)
+  datetime prevHigherTFTime = iTime(symbol, higherTF, 1); // Zamane Candle 4 saate ghabli
+  // Current timeframe candle shift in the end of the previous 4 hours
+  int beginning = iBarShift(symbol, lower_timeframe, prevHigherTFTime) - (higherTF / lower_timeframe);
+
+  for (int i = beginning; i < Bars - 1; i++)
   {
 
     int actualShift = getShift(symbol, higherTF, i);
