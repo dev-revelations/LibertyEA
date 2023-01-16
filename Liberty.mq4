@@ -133,7 +133,8 @@ void runEA()
     return;
   }
 
-  if (minutesPassed()) {
+  if (minutesPassed())
+  {
     initializeMAs();
   }
 
@@ -220,6 +221,8 @@ void scanSymbolGroups()
     {
       string symbol = group.symbols[symbolIdx];
 
+      simulate(symbol, lower_timeframe);
+
       if (IsTesting() && _Symbol != symbol)
       {
         continue;
@@ -240,8 +243,6 @@ void scanSymbolGroups()
       }
 
       RefreshRates();
-
-      simulate(symbol, lower_timeframe);
 
       StrategyResult result = runStrategy1(symbol, lower_timeframe, higher_timeframe, false /* availableEnvInGroup != ENV_NONE */, availableEnvInGroup);
       StrategyStatus status = result.status;
