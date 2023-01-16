@@ -97,7 +97,7 @@ void initLibertyMA(double &maBuffer[], string symbol, ENUM_TIMEFRAMES TimeFrame,
 
                (MA[n] - MA[current]) * n
             */
-            double diffRatio = MathAbs(maBuffer[n] - ma) * n;
+            double diffRatio = MathAbs(maBuffer[n] - ma);// * n;
 
             if (maBuffer[n] < ma)
             {
