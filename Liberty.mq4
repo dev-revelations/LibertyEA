@@ -133,13 +133,8 @@ void runEA()
     return;
   }
 
-  int currentTime = (int)TimeLocal();
-  int timePassed = (currentTime - minuteTimer) / 60;
-
-  if (timePassed >= 1)
-  {
+  if (minutesPassed()) {
     initializeMAs();
-    minuteTimer = (int)TimeLocal();
   }
 
   if (SingleChart)
@@ -1646,6 +1641,21 @@ bool TimeFilter(int start_time, int end_time)
       return false;
     }
   }
+}
+
+bool minutesPassed()
+{
+  int currentTime = (int)TimeLocal();
+  int timePassed = (currentTime - minuteTimer) / 60;
+
+  if (timePassed >= 1)
+  {
+    minuteTimer = (int)TimeLocal();
+
+    return true;
+  }
+
+  return false;
 }
 
 bool isInSession(int sessionNumber, datetime time)
