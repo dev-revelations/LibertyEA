@@ -323,7 +323,7 @@ void scanSymbolGroups()
         }
 
         // If Not have an already open order
-        canOpen = canOpen && (selectOpenOrderTicketFor(sr.symbol) > -1);
+        canOpen = canOpen && (selectOpenOrderTicketFor(sr.symbol) <= 0);
 
         if (canOpen)
         {
@@ -350,7 +350,7 @@ void scanSymbolGroups()
         }
 
         // If Not have an already open order
-        canOpen = canOpen && (selectOpenOrderTicketFor(sr.symbol) > -1);
+        canOpen = canOpen && (selectOpenOrderTicketFor(sr.symbol) <= 0);
 
         if (canOpen)
         {
