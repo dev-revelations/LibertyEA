@@ -419,7 +419,8 @@ StrategyResult runStrategy1(string symbol, ENUM_TIMEFRAMES lowTF, ENUM_TIMEFRAME
   result.status = STRATEGY_STATUS_LOCKED;
   result.symbol = symbol;
   HigherTFCrossCheckResult maCross = findHigherTimeFrameMACross(symbol, highTF);
-  if (maCross.found)
+  HigherTFCrossCheckResult virtualMACross = findHigherTimeFrameMACross(symbol, highTF, true);
+  if (maCross.found && !virtualMACross.found)
   {
 
     const bool canCheckSignals = canCheckForSignals(symbol, maCross);
@@ -502,11 +503,16 @@ StrategyResult runStrategy1(string symbol, ENUM_TIMEFRAMES lowTF, ENUM_TIMEFRAME
       }
     }
   }
+  else if (virtualMACross.found)
+  {
+    debug(symbol + " symbol being ignored, a virtual crossing has found in current higher timeframe candle");
+    // drawVLine(findSymbolChart(symbol), virtualMACross.crossCandleShift, "virtual_cross", clrAqua);
+  }
 
   return result;
 }
 
-HigherTFCrossCheckResult findHigherTimeFrameMACross(string symbol, ENUM_TIMEFRAMES higherTF)
+HigherTFCrossCheckResult findHigherTimeFrameMACross(string symbol, ENUM_TIMEFRAMES higherTF, bool onlyCurrentHigherCandle = false)
 {
   HigherTFCrossCheckResult result;
 
@@ -516,8 +522,17 @@ HigherTFCrossCheckResult findHigherTimeFrameMACross(string symbol, ENUM_TIMEFRAM
   datetime prevHigherTFTime = iTime(symbol, higherTF, 1); // Zamane Candle 4 saate ghabli
   // Current timeframe candle shift in the end of the previous 4 hours
   int beginning = iBarShift(symbol, lower_timeframe, prevHigherTFTime) - (higherTF / lower_timeframe);
+  int end = Bars - 1;
 
-  for (int i = beginning; i < Bars - 1; i++)
+  if (onlyCurrentHigherCandle)
+  {
+    datetime currentHigherTFTime = iTime(symbol, higherTF, 0);
+    beginning = 0;
+    end = iBarShift(symbol, lower_timeframe, currentHigherTFTime);
+    // drawVLine(findSymbolChart(symbol), end, "virtual_cross2", C'255,213,0');
+  }
+
+  for (int i = beginning; i < end; i++)
   {
 
     int actualShift = getShift(symbol, higherTF, i);
