@@ -50,8 +50,8 @@ extern bool EnableTradingSession3 = false;                               // Enab
 extern int SessionStart3 = 18;                                           // Session Start 3
 extern int SessionEnd3 = 23;                                             // Session End 3
 extern string _separator4_1 = "======================================="; // ===== Custom Groups =====
-extern string CustomGroup1 = "GER30 F40 UK100 US30 US2000 US500";
-extern string CustomGroup2 = "USOIL";
+extern string CustomGroup1 = "TecDE30 F40 UK100 US30 US2000 US500";
+extern string CustomGroup2 = "XBRUSD";
 extern string _separator5 = "======================================="; // ===== Test & Simulation =====
 extern bool EnableSimulation = false;
 extern bool ClearObjects = false; // Clear Objects If Simulation Is Off
@@ -264,8 +264,15 @@ void scanSymbolGroups()
         if (group.active_symbol_buy == "" || (group.active_symbol_buy != "" && isActiveSymPendingBuy))
         {
           // group.active_symbol_buy = symbol;
-          addOrderPriority(result, OP_BUY);
-          debug("Candid added to priority list " + symbol);
+          if (result.orderInfo.valid)
+          {
+            addOrderPriority(result, OP_BUY);
+            debug("Candid added to priority list " + symbol);
+          }
+          else
+          {
+            debug("Candid WAS NOT VALID for priority list " + symbol);
+          }
         }
       }
       else if ((status == STRATEGY_STATUS_IMMEDIATE_SELL || status == STRATEGY_STATUS_PENDING_SELL))
@@ -273,8 +280,15 @@ void scanSymbolGroups()
         if (group.active_symbol_sell == "" || (group.active_symbol_sell != "" && isActiveSymPendingSell))
         {
           // group.active_symbol_sell = symbol;
-          addOrderPriority(result, OP_SELL);
-          debug("Candid added to priority list " + symbol);
+          if (result.orderInfo.valid)
+          {
+            addOrderPriority(result, OP_SELL);
+            debug("Candid added to priority list " + symbol);
+          }
+          else
+          {
+            debug("Candid WAS NOT VALID for priority list " + symbol);
+          }
         }
       }
 
@@ -307,20 +321,25 @@ void scanSymbolGroups()
     if (orderPriorityListLength(OP_BUY) > 0)
     {
       StrategyResult sr = getPrioritizedOrderStrategyResult(OP_BUY);
+      if (sr.symbol != group.active_symbol_buy)
+      {
+        debug("Prioritized BUY Symbol = " + sr.symbol + " (Valid: " + (sr.orderInfo.valid ? "Yes" : "No") + ") " + " , Current Active BUY = " + group.active_symbol_buy);
+      }
 
       /*  Conditions:
           1- valid candidate
           2- candidate should be different than current active symbol
-          3- Not having current active symbol
-          4- or Having current active symbol which is pending and a candidate which is an immediate order
+          3- Not having current active symbol (Empty Active Symbol Slot)
+           or active symbol is a pending order
        */
-      bool isBuyAllowed = sr.orderInfo.valid && sr.symbol != group.active_symbol_buy && (group.active_symbol_buy == "" || (isActiveSymPendingBuy && !sr.orderInfo.pending));
+      bool isBuyAllowed = sr.orderInfo.valid && sr.symbol != group.active_symbol_buy && (group.active_symbol_buy == "" || isActiveSymPendingBuy); //!(!isActiveSymPendingBuy && !sr.orderInfo.pending));
       if (isBuyAllowed)
       {
         bool canOpen = true;
         if (activeTicketBuy > -1 && isActiveSymPendingBuy)
         {
           canOpen = OrderDelete(activeTicketBuy, clrAzure);
+          debug("Could Delete Existing Order ? " + (canOpen ? "Yes" : "No"));
         }
 
         // If Not have an already open order
@@ -333,14 +352,29 @@ void scanSymbolGroups()
           group.active_strategy_buy = sr;
           Order(sr.symbol, ENV_BUY, sr.orderInfo);
         }
+        else
+        {
+          debug("Could not open order " + sr.symbol);
+        }
       }
     }
 
     if (orderPriorityListLength(OP_SELL) > 0)
     {
       StrategyResult sr = getPrioritizedOrderStrategyResult(OP_SELL);
+      if (sr.symbol != group.active_symbol_sell)
+      {
+        debug("Prioritized BUY Symbol = " + sr.symbol + " (Valid: " + (sr.orderInfo.valid ? "Yes" : "No") + ") " + " , Current Active BUY = " + group.active_symbol_sell);
+      }
 
-      bool isSellAllowed = sr.orderInfo.valid && sr.symbol != group.active_symbol_sell && (group.active_symbol_sell == "" || (isActiveSymPendingSell && !sr.orderInfo.pending));
+      /*  Conditions:
+          1- valid candidate
+          2- candidate should be different than current active symbol
+          3- Not having current active symbol (Empty Active Symbol Slot)
+           or active symbol is a pending order
+       */
+
+      bool isSellAllowed = sr.orderInfo.valid && sr.symbol != group.active_symbol_sell && (group.active_symbol_sell == "" || isActiveSymPendingSell); //!(!isActiveSymPendingSell && !sr.orderInfo.pending));
       if (isSellAllowed)
       {
         bool canOpen = true;
@@ -348,6 +382,7 @@ void scanSymbolGroups()
         if (activeTicketSell > -1 && isActiveSymPendingSell)
         {
           canOpen = OrderDelete(activeTicketSell, clrAzure);
+          debug("Could Delete Existing Order ? " + (canOpen ? "Yes" : "No"));
         }
 
         // If Not have an already open order
@@ -359,6 +394,10 @@ void scanSymbolGroups()
           group.active_symbol_sell = sr.symbol;
           group.active_strategy_sell = sr;
           Order(sr.symbol, ENV_SELL, sr.orderInfo);
+        }
+        else
+        {
+          debug("Could not open order " + sr.symbol);
         }
       }
     }
@@ -454,6 +493,7 @@ StrategyResult runStrategy1(string symbol, ENUM_TIMEFRAMES lowTF, ENUM_TIMEFRAME
             }
 
             result.orderInfo = orderCalculated;
+            result.orderInfo.valid = true;
             result.signal = lastSignal;
 
             return result;
@@ -1384,7 +1424,6 @@ void initializeGroups()
 
   ArrayResize(groups_str_copy, GROUPS_LENGTH);
   ArrayCopy(groups_str_copy, GROUPS_STR, 0, 0, GROUPS_LENGTH);
-  
 
   if (StringLen(CustomGroup1) > 0)
   {
@@ -1503,27 +1542,27 @@ double getLibertyMA(string symbol, int period, int shift)
 {
   if (shift >= 0)
   {
-  for (int groupIdx = 0; groupIdx < GROUPS_LENGTH; groupIdx++)
-  {
-
-    GroupStruct group = GROUPS[groupIdx];
-
-    for (int symbolIdx = 0; symbolIdx < group.symbols_count; symbolIdx++)
+    for (int groupIdx = 0; groupIdx < GROUPS_LENGTH; groupIdx++)
     {
-      string sym = group.symbols[symbolIdx];
-      if (symbol == sym && iBars(sym, lower_timeframe) > 0)
-      {
-        switch (period)
-        {
-        case 5:
-          return group.MA5[symbolIdx].MA[shift];
-          break;
-        case 10:
-          return group.MA10[symbolIdx].MA[shift];
-          break;
 
-        default:
-          return EMPTY_VALUE;
+      GroupStruct group = GROUPS[groupIdx];
+
+      for (int symbolIdx = 0; symbolIdx < group.symbols_count; symbolIdx++)
+      {
+        string sym = group.symbols[symbolIdx];
+        if (symbol == sym && iBars(sym, lower_timeframe) > 0)
+        {
+          switch (period)
+          {
+          case 5:
+            return group.MA5[symbolIdx].MA[shift];
+            break;
+          case 10:
+            return group.MA10[symbolIdx].MA[shift];
+            break;
+
+          default:
+            return EMPTY_VALUE;
           }
         }
       }
