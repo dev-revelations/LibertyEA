@@ -1501,7 +1501,8 @@ void initializeMAs()
 
 double getLibertyMA(string symbol, int period, int shift)
 {
-
+  if (shift >= 0)
+  {
   for (int groupIdx = 0; groupIdx < GROUPS_LENGTH; groupIdx++)
   {
 
@@ -1523,6 +1524,7 @@ double getLibertyMA(string symbol, int period, int shift)
 
         default:
           return EMPTY_VALUE;
+          }
         }
       }
     }
