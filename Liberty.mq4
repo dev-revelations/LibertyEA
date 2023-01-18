@@ -505,7 +505,7 @@ StrategyResult runStrategy1(string symbol, ENUM_TIMEFRAMES lowTF, ENUM_TIMEFRAME
   }
   else if (virtualMACross.found)
   {
-    debug(symbol + " symbol being ignored, a virtual crossing has found in current higher timeframe candle");
+    // debug(symbol + " symbol being ignored, a virtual crossing has found in current higher timeframe candle");
     // drawVLine(findSymbolChart(symbol), virtualMACross.crossCandleShift, "virtual_cross", clrAqua);
   }
 
@@ -1213,7 +1213,11 @@ bool canCheckForSignals(string symbol, HigherTFCrossCheckResult &maCross)
       bool orderTypeDifferentThanCrossEnv = maCross.orderEnvironment == ENV_BUY && (OP == OP_SELL || OP == OP_SELLSTOP || OP == OP_SELLLIMIT);
       orderTypeDifferentThanCrossEnv = orderTypeDifferentThanCrossEnv || (maCross.orderEnvironment == ENV_SELL && (OP == OP_BUY || OP == OP_BUYSTOP || OP == OP_BUYLIMIT));
 
-      if (orderTime < cross_Time || orderTypeDifferentThanCrossEnv)
+      // HigherTFCrossCheckResult virtualMACross = findHigherTimeFrameMACross(symbol, higher_timeframe, true);
+      // bool orderTypeSameAsVirtualCrossEnv = virtualMACross.orderEnvironment == ENV_BUY && (OP == OP_BUY || OP == OP_BUYSTOP || OP == OP_BUYLIMIT);
+      // orderTypeSameAsVirtualCrossEnv = orderTypeSameAsVirtualCrossEnv || (virtualMACross.orderEnvironment == ENV_SELL && (OP == OP_SELL || OP == OP_SELLSTOP || OP == OP_SELLLIMIT));
+
+      if (orderTime < cross_Time || orderTypeDifferentThanCrossEnv /* && !(virtualMACross.found) */)
       {
         if (OP == OP_BUY || OP == OP_SELL)
         {
@@ -1235,6 +1239,10 @@ bool canCheckForSignals(string symbol, HigherTFCrossCheckResult &maCross)
 
         return true;
       }
+      // else if (virtualMACross.found)
+      // {
+      //   debug("Ignoring Change Of Environment Deleting Order Due To virtual cross" + symbol);
+      // }
 
       if (EnableBreakEven)
       {
