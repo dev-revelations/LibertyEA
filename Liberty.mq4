@@ -512,19 +512,19 @@ StrategyResult runStrategy1(string symbol, ENUM_TIMEFRAMES lowTF, ENUM_TIMEFRAME
   return result;
 }
 
-HigherTFCrossCheckResult findHigherTimeFrameMACross(string symbol, ENUM_TIMEFRAMES higherTF, bool onlyCurrentHigherCandle = false)
+HigherTFCrossCheckResult findHigherTimeFrameMACross(string symbol, ENUM_TIMEFRAMES higherTF, bool findVirtualCross = false)
 {
   HigherTFCrossCheckResult result;
 
   result.found = false;
   result.orderEnvironment = ENV_NONE;
 
-  datetime prevHigherTFTime = iTime(symbol, higherTF, 1); // Zamane Candle 4 saate ghabli
+  // datetime prevHigherTFTime = iTime(symbol, higherTF, 1); // Zamane Candle 4 saate ghabli
   // Current timeframe candle shift in the end of the previous 4 hours
-  int beginning = iBarShift(symbol, lower_timeframe, prevHigherTFTime) - (higherTF / lower_timeframe);
+  int beginning = 0; // iBarShift(symbol, lower_timeframe, prevHigherTFTime) - (higherTF / lower_timeframe);
   int end = Bars - 1;
 
-  if (onlyCurrentHigherCandle)
+  if (findVirtualCross)
   {
     datetime currentHigherTFTime = iTime(symbol, higherTF, 0);
     beginning = 0;
@@ -540,14 +540,14 @@ HigherTFCrossCheckResult findHigherTimeFrameMACross(string symbol, ENUM_TIMEFRAM
     if (actualShift < 0)
       debug("Shift Error");
 
-    double MA5_current = getLibertyMA(symbol, 5, i);  // getMA(symbol, higherTF, 5, actualShift);
-    double MA5_prev = getLibertyMA(symbol, 5, i + 1); // getMA(symbol, higherTF, 5, actualShift + 1);
+    double MA5_current = findVirtualCross ? getLibertyMA(symbol, 5, i) : getMA(symbol, higherTF, 5, actualShift);
+    double MA5_prev = findVirtualCross ? getLibertyMA(symbol, 5, i + 1) : getMA(symbol, higherTF, 5, actualShift + 1);
 
-    double MA10_current = getLibertyMA(symbol, 10, i);  // getMA(symbol, higherTF, 10, actualShift);
-    double MA10_prev = getLibertyMA(symbol, 10, i + 1); // getMA(symbol, higherTF, 10, actualShift + 1);
+    double MA10_current = findVirtualCross ? getLibertyMA(symbol, 10, i) : getMA(symbol, higherTF, 10, actualShift);
+    double MA10_prev = findVirtualCross ? getLibertyMA(symbol, 10, i + 1) : getMA(symbol, higherTF, 10, actualShift + 1);
 
     // Only Current TimeFrame data
-    int higherTFBeginningInCurrentPeriod = i; // i + (int)(higherTF / Period()) - 1;
+    int higherTFBeginningInCurrentPeriod = findVirtualCross ? i : i + (int)(higherTF / Period()) - 1;
     datetime currentShiftTime = iTime(symbol, PERIOD_CURRENT, higherTFBeginningInCurrentPeriod);
     double price = iOpen(symbol, PERIOD_CURRENT, higherTFBeginningInCurrentPeriod);
 
@@ -579,11 +579,11 @@ HigherTFCrossCheckResult findHigherTimeFrameMACross(string symbol, ENUM_TIMEFRAM
   // last validation
   if (result.found && Enable_MA_Closing)
   {
-    double MA5_current = getLibertyMA(symbol, 5, 0); // iMA(symbol, higherTF, 5, 0, MODE_SMA, PRICE_CLOSE, 0);
-    double MA5_prev = getLibertyMA(symbol, 5, 1);    // iMA(symbol, higherTF, 5, 0, MODE_SMA, PRICE_CLOSE, 1);
+    double MA5_current = findVirtualCross ? getLibertyMA(symbol, 5, 0) : iMA(symbol, higherTF, 5, 0, MODE_SMA, PRICE_CLOSE, 0);
+    double MA5_prev = findVirtualCross ? getLibertyMA(symbol, 5, 1) : iMA(symbol, higherTF, 5, 0, MODE_SMA, PRICE_CLOSE, 1);
 
-    double MA10_current = getLibertyMA(symbol, 10, 0); // iMA(symbol, higherTF, 10, 0, MODE_SMA, PRICE_CLOSE, 0);
-    double MA10_prev = getLibertyMA(symbol, 10, 1);    // iMA(symbol, higherTF, 10, 0, MODE_SMA, PRICE_CLOSE, 1);
+    double MA10_current = findVirtualCross ? getLibertyMA(symbol, 10, 0) : iMA(symbol, higherTF, 10, 0, MODE_SMA, PRICE_CLOSE, 0);
+    double MA10_prev = findVirtualCross ? getLibertyMA(symbol, 10, 1) : iMA(symbol, higherTF, 10, 0, MODE_SMA, PRICE_CLOSE, 1);
 
     const bool buyValidation = (MA5_current > MA10_current);
     const bool sellValidation = (MA5_current < MA10_current);
