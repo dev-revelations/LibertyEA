@@ -25,10 +25,18 @@ void initLibertyMA(double &maBuffer[], string symbol, ENUM_TIMEFRAMES TimeFrame,
         if (TimeFrame < Period())
             shift1 = iBarShift(symbol, TimeFrame, iTime(symbol, Period(), i));
 
+        if(shift1 < 0) {
+            continue;
+        } 
+
         int time1 = (int) iTime(symbol, TimeFrame, shift1),
             shift2 = iBarShift(symbol, 0, time1);
 
         double ma = iMA(symbol, TimeFrame, PERIOD, 0, Method, AppliedPrice, shift1);
+
+        if(shift2 < 0) {
+            continue;
+        } 
 
         //----
         //	old (closed) candles
