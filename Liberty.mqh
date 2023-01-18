@@ -186,6 +186,7 @@ int orderPriorityListLength(int OP)
 StrategyResult getPrioritizedOrderStrategyResult(int OP)
 {
     int targetCount = orderPriorityListLength(OP);
+    // Print("Prioriti List Type: ", OP == OP_BUY ? "Buy" : "Sell");
     return OP == OP_BUY ? prioritizeOrders(BUY_PRIORITY_CHECK_LIST, targetCount) : prioritizeOrders(SELL_PRIORITY_CHECK_LIST, targetCount);
 }
 
@@ -216,6 +217,8 @@ StrategyResult prioritizeOrders(StrategyResult &list[], int count)
             }
             else
             {
+                Print(item.symbol, " From Prioritization List");
+
                 // One is immediate
                 if (result.orderInfo.pending && !item.orderInfo.pending)
                 {

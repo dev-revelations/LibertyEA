@@ -50,8 +50,8 @@ extern bool EnableTradingSession3 = false;                               // Enab
 extern int SessionStart3 = 18;                                           // Session Start 3
 extern int SessionEnd3 = 23;                                             // Session End 3
 extern string _separator4_1 = "======================================="; // ===== Custom Groups =====
-extern string CustomGroup1 = "GER30 F40 UK100 US30 US2000 US500";
-extern string CustomGroup2 = "USOIL";
+extern string CustomGroup1 = "TecDE30 F40 UK100 US30 US2000 US500";
+extern string CustomGroup2 = "XBRUSD";
 extern string _separator5 = "======================================="; // ===== Test & Simulation =====
 extern bool EnableSimulation = false;
 extern bool ClearObjects = false; // Clear Objects If Simulation Is Off
@@ -264,8 +264,15 @@ void scanSymbolGroups()
         if (group.active_symbol_buy == "" || (group.active_symbol_buy != "" && isActiveSymPendingBuy))
         {
           // group.active_symbol_buy = symbol;
-          addOrderPriority(result, OP_BUY);
-          debug("Candid added to priority list " + symbol);
+          if (result.orderInfo.valid)
+          {
+            addOrderPriority(result, OP_BUY);
+            debug("Candid added to priority list " + symbol);
+          }
+          else
+          {
+            debug("Candid WAS NOT VALID for priority list " + symbol);
+          }
         }
       }
       else if ((status == STRATEGY_STATUS_IMMEDIATE_SELL || status == STRATEGY_STATUS_PENDING_SELL))
@@ -273,8 +280,15 @@ void scanSymbolGroups()
         if (group.active_symbol_sell == "" || (group.active_symbol_sell != "" && isActiveSymPendingSell))
         {
           // group.active_symbol_sell = symbol;
-          addOrderPriority(result, OP_SELL);
-          debug("Candid added to priority list " + symbol);
+          if (result.orderInfo.valid)
+          {
+            addOrderPriority(result, OP_SELL);
+            debug("Candid added to priority list " + symbol);
+          }
+          else
+          {
+            debug("Candid WAS NOT VALID for priority list " + symbol);
+          }
         }
       }
 
@@ -307,20 +321,25 @@ void scanSymbolGroups()
     if (orderPriorityListLength(OP_BUY) > 0)
     {
       StrategyResult sr = getPrioritizedOrderStrategyResult(OP_BUY);
+      if (sr.symbol != group.active_symbol_buy)
+      {
+        debug("Prioritized BUY Symbol = " + sr.symbol + " (Valid: " + (sr.orderInfo.valid ? "Yes" : "No") + ") " + " , Current Active BUY = " + group.active_symbol_buy);
+      }
 
       /*  Conditions:
           1- valid candidate
           2- candidate should be different than current active symbol
-          3- Not having current active symbol
-          4- or Having current active symbol which is pending and a candidate which is an immediate order
+          3- Not having current active symbol (Empty Active Symbol Slot)
+           or active symbol is a pending order
        */
-      bool isBuyAllowed = sr.orderInfo.valid && sr.symbol != group.active_symbol_buy && (group.active_symbol_buy == "" || (isActiveSymPendingBuy && !sr.orderInfo.pending));
+      bool isBuyAllowed = sr.orderInfo.valid && sr.symbol != group.active_symbol_buy && (group.active_symbol_buy == "" || isActiveSymPendingBuy); //!(!isActiveSymPendingBuy && !sr.orderInfo.pending));
       if (isBuyAllowed)
       {
         bool canOpen = true;
         if (activeTicketBuy > -1 && isActiveSymPendingBuy)
         {
           canOpen = OrderDelete(activeTicketBuy, clrAzure);
+          debug("Could Delete Existing Order ? " + (canOpen ? "Yes" : "No"));
         }
 
         // If Not have an already open order
@@ -333,14 +352,29 @@ void scanSymbolGroups()
           group.active_strategy_buy = sr;
           Order(sr.symbol, ENV_BUY, sr.orderInfo);
         }
+        else
+        {
+          debug("Could not open order " + sr.symbol);
+        }
       }
     }
 
     if (orderPriorityListLength(OP_SELL) > 0)
     {
       StrategyResult sr = getPrioritizedOrderStrategyResult(OP_SELL);
+      if (sr.symbol != group.active_symbol_sell)
+      {
+        debug("Prioritized BUY Symbol = " + sr.symbol + " (Valid: " + (sr.orderInfo.valid ? "Yes" : "No") + ") " + " , Current Active BUY = " + group.active_symbol_sell);
+      }
 
-      bool isSellAllowed = sr.orderInfo.valid && sr.symbol != group.active_symbol_sell && (group.active_symbol_sell == "" || (isActiveSymPendingSell && !sr.orderInfo.pending));
+      /*  Conditions:
+          1- valid candidate
+          2- candidate should be different than current active symbol
+          3- Not having current active symbol (Empty Active Symbol Slot)
+           or active symbol is a pending order
+       */
+
+      bool isSellAllowed = sr.orderInfo.valid && sr.symbol != group.active_symbol_sell && (group.active_symbol_sell == "" || isActiveSymPendingSell); //!(!isActiveSymPendingSell && !sr.orderInfo.pending));
       if (isSellAllowed)
       {
         bool canOpen = true;
@@ -348,6 +382,7 @@ void scanSymbolGroups()
         if (activeTicketSell > -1 && isActiveSymPendingSell)
         {
           canOpen = OrderDelete(activeTicketSell, clrAzure);
+          debug("Could Delete Existing Order ? " + (canOpen ? "Yes" : "No"));
         }
 
         // If Not have an already open order
@@ -359,6 +394,10 @@ void scanSymbolGroups()
           group.active_symbol_sell = sr.symbol;
           group.active_strategy_sell = sr;
           Order(sr.symbol, ENV_SELL, sr.orderInfo);
+        }
+        else
+        {
+          debug("Could not open order " + sr.symbol);
         }
       }
     }
@@ -380,7 +419,8 @@ StrategyResult runStrategy1(string symbol, ENUM_TIMEFRAMES lowTF, ENUM_TIMEFRAME
   result.status = STRATEGY_STATUS_LOCKED;
   result.symbol = symbol;
   HigherTFCrossCheckResult maCross = findHigherTimeFrameMACross(symbol, highTF);
-  if (maCross.found)
+  HigherTFCrossCheckResult virtualMACross = findHigherTimeFrameMACross(symbol, highTF, true);
+  if (maCross.found && !virtualMACross.found)
   {
 
     const bool canCheckSignals = canCheckForSignals(symbol, maCross);
@@ -454,6 +494,7 @@ StrategyResult runStrategy1(string symbol, ENUM_TIMEFRAMES lowTF, ENUM_TIMEFRAME
             }
 
             result.orderInfo = orderCalculated;
+            result.orderInfo.valid = true;
             result.signal = lastSignal;
 
             return result;
@@ -462,18 +503,36 @@ StrategyResult runStrategy1(string symbol, ENUM_TIMEFRAMES lowTF, ENUM_TIMEFRAME
       }
     }
   }
+  else if (virtualMACross.found)
+  {
+    // debug(symbol + " symbol being ignored, a virtual crossing has found in current higher timeframe candle");
+    // drawVLine(findSymbolChart(symbol), virtualMACross.crossCandleShift, "virtual_cross", clrAqua);
+  }
 
   return result;
 }
 
-HigherTFCrossCheckResult findHigherTimeFrameMACross(string symbol, ENUM_TIMEFRAMES higherTF)
+HigherTFCrossCheckResult findHigherTimeFrameMACross(string symbol, ENUM_TIMEFRAMES higherTF, bool findVirtualCross = false)
 {
   HigherTFCrossCheckResult result;
 
   result.found = false;
   result.orderEnvironment = ENV_NONE;
 
-  for (int i = 0; i < Bars - 1; i++)
+  // datetime prevHigherTFTime = iTime(symbol, higherTF, 1); // Zamane Candle 4 saate ghabli
+  // Current timeframe candle shift in the end of the previous 4 hours
+  int beginning = 0; // iBarShift(symbol, lower_timeframe, prevHigherTFTime) - (higherTF / lower_timeframe);
+  int end = Bars - 1;
+
+  if (findVirtualCross)
+  {
+    datetime currentHigherTFTime = iTime(symbol, higherTF, 0);
+    beginning = 0;
+    end = iBarShift(symbol, lower_timeframe, currentHigherTFTime);
+    // drawVLine(findSymbolChart(symbol), end, "virtual_cross2", C'255,213,0');
+  }
+
+  for (int i = beginning; i < end; i++)
   {
 
     int actualShift = getShift(symbol, higherTF, i);
@@ -481,14 +540,14 @@ HigherTFCrossCheckResult findHigherTimeFrameMACross(string symbol, ENUM_TIMEFRAM
     if (actualShift < 0)
       debug("Shift Error");
 
-    double MA5_current = getLibertyMA(symbol, 5, i);  // getMA(symbol, higherTF, 5, actualShift);
-    double MA5_prev = getLibertyMA(symbol, 5, i + 1); // getMA(symbol, higherTF, 5, actualShift + 1);
+    double MA5_current = findVirtualCross ? getLibertyMA(symbol, 5, i) : getMA(symbol, higherTF, 5, actualShift);
+    double MA5_prev = findVirtualCross ? getLibertyMA(symbol, 5, i + 1) : getMA(symbol, higherTF, 5, actualShift + 1);
 
-    double MA10_current = getLibertyMA(symbol, 10, i);  // getMA(symbol, higherTF, 10, actualShift);
-    double MA10_prev = getLibertyMA(symbol, 10, i + 1); // getMA(symbol, higherTF, 10, actualShift + 1);
+    double MA10_current = findVirtualCross ? getLibertyMA(symbol, 10, i) : getMA(symbol, higherTF, 10, actualShift);
+    double MA10_prev = findVirtualCross ? getLibertyMA(symbol, 10, i + 1) : getMA(symbol, higherTF, 10, actualShift + 1);
 
     // Only Current TimeFrame data
-    int higherTFBeginningInCurrentPeriod = i; // i + (int)(higherTF / Period()) - 1;
+    int higherTFBeginningInCurrentPeriod = findVirtualCross ? i : i + (int)(higherTF / Period()) - 1;
     datetime currentShiftTime = iTime(symbol, PERIOD_CURRENT, higherTFBeginningInCurrentPeriod);
     double price = iOpen(symbol, PERIOD_CURRENT, higherTFBeginningInCurrentPeriod);
 
@@ -520,11 +579,11 @@ HigherTFCrossCheckResult findHigherTimeFrameMACross(string symbol, ENUM_TIMEFRAM
   // last validation
   if (result.found && Enable_MA_Closing)
   {
-    double MA5_current = getLibertyMA(symbol, 5, 0); // iMA(symbol, higherTF, 5, 0, MODE_SMA, PRICE_CLOSE, 0);
-    double MA5_prev = getLibertyMA(symbol, 5, 1);    // iMA(symbol, higherTF, 5, 0, MODE_SMA, PRICE_CLOSE, 1);
+    double MA5_current = findVirtualCross ? getLibertyMA(symbol, 5, 0) : iMA(symbol, higherTF, 5, 0, MODE_SMA, PRICE_CLOSE, 0);
+    double MA5_prev = findVirtualCross ? getLibertyMA(symbol, 5, 1) : iMA(symbol, higherTF, 5, 0, MODE_SMA, PRICE_CLOSE, 1);
 
-    double MA10_current = getLibertyMA(symbol, 10, 0); // iMA(symbol, higherTF, 10, 0, MODE_SMA, PRICE_CLOSE, 0);
-    double MA10_prev = getLibertyMA(symbol, 10, 1);    // iMA(symbol, higherTF, 10, 0, MODE_SMA, PRICE_CLOSE, 1);
+    double MA10_current = findVirtualCross ? getLibertyMA(symbol, 10, 0) : iMA(symbol, higherTF, 10, 0, MODE_SMA, PRICE_CLOSE, 0);
+    double MA10_prev = findVirtualCross ? getLibertyMA(symbol, 10, 1) : iMA(symbol, higherTF, 10, 0, MODE_SMA, PRICE_CLOSE, 1);
 
     const bool buyValidation = (MA5_current > MA10_current);
     const bool sellValidation = (MA5_current < MA10_current);
@@ -1154,7 +1213,11 @@ bool canCheckForSignals(string symbol, HigherTFCrossCheckResult &maCross)
       bool orderTypeDifferentThanCrossEnv = maCross.orderEnvironment == ENV_BUY && (OP == OP_SELL || OP == OP_SELLSTOP || OP == OP_SELLLIMIT);
       orderTypeDifferentThanCrossEnv = orderTypeDifferentThanCrossEnv || (maCross.orderEnvironment == ENV_SELL && (OP == OP_BUY || OP == OP_BUYSTOP || OP == OP_BUYLIMIT));
 
-      if (orderTime < cross_Time || orderTypeDifferentThanCrossEnv)
+      // HigherTFCrossCheckResult virtualMACross = findHigherTimeFrameMACross(symbol, higher_timeframe, true);
+      // bool orderTypeSameAsVirtualCrossEnv = virtualMACross.orderEnvironment == ENV_BUY && (OP == OP_BUY || OP == OP_BUYSTOP || OP == OP_BUYLIMIT);
+      // orderTypeSameAsVirtualCrossEnv = orderTypeSameAsVirtualCrossEnv || (virtualMACross.orderEnvironment == ENV_SELL && (OP == OP_SELL || OP == OP_SELLSTOP || OP == OP_SELLLIMIT));
+
+      if (orderTime < cross_Time || orderTypeDifferentThanCrossEnv /* && !(virtualMACross.found) */)
       {
         if (OP == OP_BUY || OP == OP_SELL)
         {
@@ -1176,6 +1239,10 @@ bool canCheckForSignals(string symbol, HigherTFCrossCheckResult &maCross)
 
         return true;
       }
+      // else if (virtualMACross.found)
+      // {
+      //   debug("Ignoring Change Of Environment Deleting Order Due To virtual cross" + symbol);
+      // }
 
       if (EnableBreakEven)
       {
@@ -1375,26 +1442,30 @@ void checkForBreakEven(string symbol, int orderIndex)
 void initializeGroups()
 {
   debug("==========================");
+  string groups_str_copy[];
   GROUPS_LENGTH = ArraySize(GROUPS_STR);
+
+  ArrayResize(groups_str_copy, GROUPS_LENGTH);
+  ArrayCopy(groups_str_copy, GROUPS_STR, 0, 0, GROUPS_LENGTH);
 
   if (StringLen(CustomGroup1) > 0)
   {
     GROUPS_LENGTH++;
-    ArrayResize(GROUPS_STR, GROUPS_LENGTH);
-    GROUPS_STR[GROUPS_LENGTH - 1] = CustomGroup1;
+    ArrayResize(groups_str_copy, GROUPS_LENGTH);
+    groups_str_copy[GROUPS_LENGTH - 1] = CustomGroup1;
   }
 
   if (StringLen(CustomGroup2) > 0)
   {
     GROUPS_LENGTH++;
-    ArrayResize(GROUPS_STR, GROUPS_LENGTH);
-    GROUPS_STR[GROUPS_LENGTH - 1] = CustomGroup2;
+    ArrayResize(groups_str_copy, GROUPS_LENGTH);
+    groups_str_copy[GROUPS_LENGTH - 1] = CustomGroup2;
   }
 
   ArrayResize(GROUPS, GROUPS_LENGTH);
   for (int i = 0; i < GROUPS_LENGTH; i++)
   {
-    string symbolsStr = GROUPS_STR[i];
+    string symbolsStr = groups_str_copy[i];
     GroupStruct group;
     StringSplit(symbolsStr, SYMBOL_SEPARATOR, group.symbols);
     group.symbols_count = ArraySize(group.symbols);
@@ -1492,28 +1563,30 @@ void initializeMAs()
 
 double getLibertyMA(string symbol, int period, int shift)
 {
-
-  for (int groupIdx = 0; groupIdx < GROUPS_LENGTH; groupIdx++)
+  if (shift >= 0)
   {
-
-    GroupStruct group = GROUPS[groupIdx];
-
-    for (int symbolIdx = 0; symbolIdx < group.symbols_count; symbolIdx++)
+    for (int groupIdx = 0; groupIdx < GROUPS_LENGTH; groupIdx++)
     {
-      string sym = group.symbols[symbolIdx];
-      if (symbol == sym && iBars(sym, lower_timeframe) > 0)
-      {
-        switch (period)
-        {
-        case 5:
-          return group.MA5[symbolIdx].MA[shift];
-          break;
-        case 10:
-          return group.MA10[symbolIdx].MA[shift];
-          break;
 
-        default:
-          return EMPTY_VALUE;
+      GroupStruct group = GROUPS[groupIdx];
+
+      for (int symbolIdx = 0; symbolIdx < group.symbols_count; symbolIdx++)
+      {
+        string sym = group.symbols[symbolIdx];
+        if (symbol == sym && iBars(sym, lower_timeframe) > 0)
+        {
+          switch (period)
+          {
+          case 5:
+            return group.MA5[symbolIdx].MA[shift];
+            break;
+          case 10:
+            return group.MA10[symbolIdx].MA[shift];
+            break;
+
+          default:
+            return EMPTY_VALUE;
+          }
         }
       }
     }

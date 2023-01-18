@@ -4,7 +4,7 @@ const int MA_MAX_LENGTH = 1000;
 void initLibertyMA(double &maBuffer[], string symbol, ENUM_TIMEFRAMES TimeFrame, int PERIOD, ENUM_MA_METHOD Method, ENUM_APPLIED_PRICE AppliedPrice)
 {
 
-    int currentTFBars = iBars(symbol, Period())/2;
+    int currentTFBars = iBars(symbol, Period());
 
     int bars1 = iBars(symbol, TimeFrame),
         start1 = bars1 - 1,
@@ -25,10 +25,18 @@ void initLibertyMA(double &maBuffer[], string symbol, ENUM_TIMEFRAMES TimeFrame,
         if (TimeFrame < Period())
             shift1 = iBarShift(symbol, TimeFrame, iTime(symbol, Period(), i));
 
+        if(shift1 < 0) {
+            continue;
+        } 
+
         int time1 = (int) iTime(symbol, TimeFrame, shift1),
             shift2 = iBarShift(symbol, 0, time1);
 
         double ma = iMA(symbol, TimeFrame, PERIOD, 0, Method, AppliedPrice, shift1);
+
+        if(shift2 < 0) {
+            continue;
+        } 
 
         //----
         //	old (closed) candles
