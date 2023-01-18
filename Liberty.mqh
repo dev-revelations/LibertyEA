@@ -227,7 +227,7 @@ StrategyResult prioritizeOrders(StrategyResult &list[], int count)
                 }
 
                 // Both are immediate or both are pendings
-                if ((!result.orderInfo.pending && !item.orderInfo.pending) || (result.orderInfo.pending && item.orderInfo.pending))
+                if ((!result.orderInfo.pending && !item.orderInfo.pending) /* || (result.orderInfo.pending && item.orderInfo.pending) */)
                 {
                     // Check mikonim har kodam stoplosseshan chanta average candle size ast?
                     const double currentSlSize = MathAbs(result.orderInfo.orderPrice - result.orderInfo.slPrice) / result.orderInfo.averageCandleSize;
