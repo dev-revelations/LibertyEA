@@ -17,11 +17,16 @@ extern bool SingleChart = false; // Single Chart Scan
 extern bool EnableEATimer = true;                                        // Enable EA Timer
 extern int EATimerSconds = 1;                                            // EA Timer Interval Seconds
 extern bool CheckSignalsOnNewCandle = true;                              // Check for signals on new candle openning
+extern string _separator1_2 = "======================================="; // ===== Average Candle Size Settings =====
+extern double StopLossGapInAverageCandleSize = 0.2;
+extern double AverageCandleSizeRatio = 2.25;
+extern int AverageCandleSizePeriod = 40;
 extern string _separator1 = "=======================================";   // ===== Higher Timeframe =====
 extern ENUM_TIMEFRAMES higher_timeframe = PERIOD_H4;                     // Higher Timeframe
 extern bool Enable_MA_Closing = false;                                   // Enable MA Closing Detection
 extern double MA_Closing_AverageCandleSize_Ratio = 2;                    // MA closing ratio in Average Candle Size
 extern int MA_Closing_Delay = 2;                                         // Number of higher TF candles should wait
+extern double MA_Touch_Thickness_Ratio = 0.4;                            // Higher MA Touch Thickness Ratio in Average Candle Size
 extern string _separator1_1 = "======================================="; // ===== Lower Timeframe =====
 extern ENUM_TIMEFRAMES lower_timeframe = PERIOD_M5;                      // Lower Timeframe (Never select current)
 extern bool OnlyMaCandleBreaks = true;                                   // Shohld candle break MA?
@@ -30,9 +35,6 @@ extern int MagicNumber = 1111;
 extern double RiskPercent = 1;
 extern double TakeProfitRatio = 3;
 // extern double StoplossGapInPip = 2;
-extern double StopLossGapInAverageCandleSize = 0.2;
-extern double AverageCandleSizeRatio = 2.25;
-extern int AverageCandleSizePeriod = 40;
 extern int PendingsExpirationMinutes = 300;
 extern string CommentText = "";
 extern bool EnableBreakEven = true;                                      // Enable Break Even
@@ -622,13 +624,15 @@ HigherTFCrossCheckResult findHigherTimeFrameMACross(string symbol, ENUM_TIMEFRAM
 
 bool isAreaTouched(string symbol, ENUM_TIMEFRAMES higherTF, OrderEnvironment orderEnv, int shift, ENUM_TIMEFRAMES lower_tf)
 {
-  int actualHigherShift = getShift(symbol, higherTF, shift);
+  // int actualHigherShift = getShift(symbol, higherTF, shift);
 
-  if (actualHigherShift >= 0)
-  {
+  // if (actualHigherShift >= 0)
+  // {
     double h4_ma5 = getLibertyMA(symbol, 5, shift); // getMA(symbol, higherTF, 5, actualHigherShift);
+  double h4_ma5_thickness = averageCandleSize(symbol, lower_tf, shift, AverageCandleSizePeriod) * MA_Touch_Thickness_Ratio;
     if (orderEnv == ENV_SELL)
     {
+    h4_ma5 -= h4_ma5_thickness;
       double m5_high = iHigh(symbol, lower_tf, shift);
       if (m5_high >= h4_ma5)
       {
@@ -638,13 +642,14 @@ bool isAreaTouched(string symbol, ENUM_TIMEFRAMES higherTF, OrderEnvironment ord
 
     if (orderEnv == ENV_BUY)
     {
+    h4_ma5 += h4_ma5_thickness;
       double m5_low = iLow(symbol, lower_tf, shift);
       if (m5_low <= h4_ma5)
       {
         return true;
       }
     }
-  }
+  // }
   return false;
 }
 
