@@ -118,12 +118,14 @@ struct GroupStruct
     StrategyResult active_strategy_sell;
     MA_Array MA5[];
     MA_Array MA10[];
+    int groupIndex;
 
     GroupStruct()
     {
         active_symbol_buy = "";
         active_symbol_sell = "";
         symbols_count = 0;
+        groupIndex = -1;
     }
 };
 

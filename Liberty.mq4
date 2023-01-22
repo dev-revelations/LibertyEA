@@ -142,7 +142,7 @@ void runEA()
 
   if (SingleChart)
   {
-    runStrategy1(_Symbol, lower_timeframe, higher_timeframe);
+    runStrategy1(_Symbol, lower_timeframe, higher_timeframe, 0);
   }
   else
   {
@@ -162,23 +162,6 @@ void scanSymbolGroups()
 
     GroupStruct group = GROUPS[groupIdx];
 
-    ////////////// Define Available Order Environments For The Group //////////////
-
-    OrderEnvironment availableEnvInGroup = ENV_BOTH;
-
-    if (group.active_symbol_buy != "" && group.active_symbol_sell == "")
-    {
-      availableEnvInGroup = ENV_SELL;
-    }
-    else if (group.active_symbol_sell != "" && group.active_symbol_buy == "")
-    {
-      availableEnvInGroup = ENV_BUY;
-    }
-    else if (group.active_symbol_sell != "" && group.active_symbol_buy != "")
-    {
-      availableEnvInGroup = ENV_NONE;
-    }
-
     ////////////// Adding Active Symbols to the Comment //////////////
 
     if (group.active_symbol_buy != "")
@@ -197,7 +180,7 @@ void scanSymbolGroups()
     int activeTicketSell = -1;
     if (/* PrioritizeSameGroup && */ group.active_symbol_sell != "")
     {
-      activeTicketSell = selectOpenOrderTicketFor(group.active_symbol_sell);
+      activeTicketSell = selectOpenOrderTicketFor(group.active_symbol_sell, groupIdx);
       if (activeTicketSell > -1)
       {
         int OP = OrderType();
@@ -209,7 +192,7 @@ void scanSymbolGroups()
     int activeTicketBuy = -1;
     if (/* PrioritizeSameGroup && */ group.active_symbol_buy != "")
     {
-      activeTicketBuy = selectOpenOrderTicketFor(group.active_symbol_buy);
+      activeTicketBuy = selectOpenOrderTicketFor(group.active_symbol_buy, groupIdx);
       if (activeTicketBuy > -1)
       {
         int OP = OrderType();
@@ -246,7 +229,7 @@ void scanSymbolGroups()
 
       RefreshRates();
 
-      StrategyResult result = runStrategy1(symbol, lower_timeframe, higher_timeframe, false /* availableEnvInGroup != ENV_NONE */, availableEnvInGroup);
+      StrategyResult result = runStrategy1(symbol, lower_timeframe, higher_timeframe, groupIdx);
       StrategyStatus status = result.status;
       // If for any reason the strategy is locked for the current symbol then we will ignore it
       // In current context it happens when the symbol had profits in pervious sessions and in current crossing
@@ -407,15 +390,7 @@ void scanSymbolGroups()
     GROUPS[groupIdx] = group; // Hatman bayad dobare set shavad ta taghirat emal shavad
   }
 
-  Comment(
-      "Current Session: " + IntegerToString(getSessionNumber(TimeCurrent())),
-      "\nActive Symbols (BUY):\n",
-      activeSymbolsListBuy,
-      "\nActive Symbols (SELL):\n",
-      activeSymbolsListSell);
-}
-
-StrategyResult runStrategy1(string symbol, ENUM_TIMEFRAMES lowTF, ENUM_TIMEFRAMES highTF, bool trade = true, OrderEnvironment allowedEnv = ENV_BOTH)
+StrategyResult runStrategy1(string symbol, ENUM_TIMEFRAMES lowTF, ENUM_TIMEFRAMES highTF, int groupIndex)
 {
   StrategyResult result;
   result.status = STRATEGY_STATUS_LOCKED;
@@ -425,7 +400,7 @@ StrategyResult runStrategy1(string symbol, ENUM_TIMEFRAMES lowTF, ENUM_TIMEFRAME
   if (maCross.found && !virtualMACross.found)
   {
 
-    const bool canCheckSignals = canCheckForSignals(symbol, maCross);
+    const bool canCheckSignals = canCheckForSignals(symbol, maCross, groupIndex);
 
     if (canCheckSignals)
     {
@@ -456,13 +431,6 @@ StrategyResult runStrategy1(string symbol, ENUM_TIMEFRAMES lowTF, ENUM_TIMEFRAME
         {
 
           OrderInfoResult entry = getSymbolEntry(symbol, lowTF, firstAreaTouchShift, maCross, signals);
-          // if (entry.valid && trade && (allowedEnv == ENV_BOTH || allowedEnv == maCross.orderEnvironment))
-          // {
-          //   Order(symbol, maCross.orderEnvironment, entry);
-          //   long chartId = findSymbolChart(symbol);
-          //   drawVLine(chartId, 0, "Order_" + IntegerToString(lastSignal.maChangeShift), clrOrange);
-          //   // breakPoint();
-          // }
 
           // Preparing the strategy result
           if (maCross.orderEnvironment == ENV_SELL)
@@ -1206,7 +1174,7 @@ double GetLotSize(string symbol, double riskPercent, double price, double slPric
   return lots;
 }
 
-int Order(string symbol, OrderEnvironment orderEnv, OrderInfoResult &orderInfo, string comment = "")
+int Order(string symbol, OrderEnvironment orderEnv, OrderInfoResult &orderInfo, int magicNumber, string comment = "")
 {
   int expiration = 0;
 
@@ -1267,12 +1235,12 @@ int Order(string symbol, OrderEnvironment orderEnv, OrderInfoResult &orderInfo, 
       SL,
       TP,
       comment != "" ? comment : CommentText,
-      MagicNumber,
+      magicNumber,
       expiration,
       Green);
 }
 
-bool canCheckForSignals(string symbol, HigherTFCrossCheckResult &maCross)
+bool canCheckForSignals(string symbol, HigherTFCrossCheckResult &maCross, int groupIndex)
 {
   int total = OrdersTotal();
   for (int pos = 0; pos < total; pos++)
@@ -1280,7 +1248,7 @@ bool canCheckForSignals(string symbol, HigherTFCrossCheckResult &maCross)
     if (OrderSelect(pos, SELECT_BY_POS) == false)
       continue;
 
-    if (symbol == OrderSymbol() && OrderMagicNumber() == MagicNumber)
+    if (symbol == OrderSymbol() && OrderMagicNumber() == getMagicNumber(groupIndex))
     {
       int orderTime = (int)OrderOpenTime();
       int cross_Time = (int)maCross.crossTime;
@@ -1342,6 +1310,14 @@ bool canCheckForSignals(string symbol, HigherTFCrossCheckResult &maCross)
   return true;
 }
 
+int getMagicNumber(int groupIndex)
+{
+  string magicString = IntegerToString(MagicNumber);
+  magicString += IntegerToString(getSessionNumber(TimeCurrent()));
+  magicString += IntegerToString(groupIndex);
+
+  return (int)StringToInteger(magicString);
+}
 /////////////////////////// Order Management Helpers ///////////////////////////
 void processEAOrders()
 {
@@ -1367,7 +1343,7 @@ void processEAOrders()
   syncActiveSymbolOrders();
 }
 
-int selectLastHistoryOrderTicketFor(string symbol)
+int selectLastHistoryOrderTicketFor(string symbol, int groupIndex)
 {
   int i, hstTotal = OrdersHistoryTotal();
   int lastTicket = -1;
@@ -1380,7 +1356,7 @@ int selectLastHistoryOrderTicketFor(string symbol)
       continue;
     }
 
-    if (symbol == OrderSymbol() && OrderMagicNumber() == MagicNumber)
+    if (symbol == OrderSymbol() && OrderMagicNumber() == getMagicNumber(groupIndex))
     {
       int orderTime = (int)OrderOpenTime();
       if (orderTime > lastFoundOrderTime)
@@ -1394,9 +1370,9 @@ int selectLastHistoryOrderTicketFor(string symbol)
   return lastTicket;
 }
 
-bool symbolHasProfitInCurrentCrossing(string symbol, int crossTime = -1)
+bool symbolHasProfitInCurrentCrossing(string symbol, int groupIndex, int crossTime = -1)
 {
-  int lastHistoryOrderTicket = selectLastHistoryOrderTicketFor(symbol);
+  int lastHistoryOrderTicket = selectLastHistoryOrderTicketFor(symbol, groupIndex);
 
   if ((int)crossTime == -1)
   {
@@ -1411,7 +1387,7 @@ bool symbolHasProfitInCurrentCrossing(string symbol, int crossTime = -1)
   {
     if (lastHistoryOrderTicket > -1 && OrderSelect(lastHistoryOrderTicket, SELECT_BY_TICKET, MODE_HISTORY) == true)
     {
-      if (symbol == OrderSymbol() && OrderMagicNumber() == MagicNumber && !isOpPending(OrderType()))
+      if (symbol == OrderSymbol() && OrderMagicNumber() == getMagicNumber(groupIndex) && !isOpPending(OrderType()))
       {
         bool hadProfit = OrderProfit() >= 0; // OrderClosePrice() >= OrderTakeProfit();
         if (hadProfit)
@@ -1449,7 +1425,7 @@ bool symbolHasProfitInCurrentCrossing(string symbol, int crossTime = -1)
   return false;
 }
 
-int selectOpenOrderTicketFor(string symbol)
+int selectOpenOrderTicketFor(string symbol, int groupIndex)
 {
   int total = OrdersTotal();
   for (int pos = 0; pos < total; pos++)
@@ -1457,7 +1433,7 @@ int selectOpenOrderTicketFor(string symbol)
     if (OrderSelect(pos, SELECT_BY_POS) == false)
       continue;
 
-    if (symbol == OrderSymbol() && OrderMagicNumber() == MagicNumber)
+    if (symbol == OrderSymbol() && OrderMagicNumber() == getMagicNumber(groupIndex))
     {
       return OrderTicket();
     }
@@ -1547,6 +1523,7 @@ void initializeGroups()
   {
     string symbolsStr = groups_str_copy[i];
     GroupStruct group;
+    group.groupIndex = i;
     StringSplit(symbolsStr, SYMBOL_SEPARATOR, group.symbols);
     group.symbols_count = ArraySize(group.symbols);
 
@@ -1561,8 +1538,8 @@ void initializeGroups()
     for (int symIndex = 0; symIndex < group.symbols_count; symIndex++)
     {
       string sym = group.symbols[symIndex];
-      int ticket = selectOpenOrderTicketFor(sym);
-      if (ticket > -1 && OrderSelect(ticket, SELECT_BY_TICKET) == true && sym == OrderSymbol() && OrderMagicNumber() == MagicNumber)
+      int ticket = selectOpenOrderTicketFor(sym, group.groupIndex);
+      if (ticket > -1 && OrderSelect(ticket, SELECT_BY_TICKET) == true && sym == OrderSymbol() && OrderMagicNumber() == getMagicNumber(group.groupIndex))
       {
         int orderSession = getSessionNumber(OrderOpenTime());
         int currentSession = getSessionNumber(TimeCurrent());
@@ -1588,7 +1565,7 @@ void initializeGroups()
         }
       }
 
-      if (symbolHasProfitInCurrentCrossing(sym))
+      if (symbolHasProfitInCurrentCrossing(sym, group.groupIndex))
       {
         int orderSession = getSessionNumber(OrderOpenTime());
         int currentSession = getSessionNumber(TimeCurrent());
@@ -1767,7 +1744,7 @@ void syncActiveSymbolOrders()
   {
     GroupStruct group = GROUPS[groupIdx];
 
-    if (group.active_symbol_buy != "" && hasActiveTransaction(group.active_symbol_buy) == false)
+    if (group.active_symbol_buy != "" && hasActiveTransaction(group.active_symbol_buy, groupIdx) == false)
     {
       debug("Active Symbol Cleard For Expired Pending " + group.active_symbol_buy);
       group.active_symbol_buy = "";
@@ -1775,7 +1752,7 @@ void syncActiveSymbolOrders()
       group.active_strategy_buy = sr;
     }
 
-    if (group.active_symbol_sell != "" && hasActiveTransaction(group.active_symbol_sell) == false)
+    if (group.active_symbol_sell != "" && hasActiveTransaction(group.active_symbol_sell, groupIdx) == false)
     {
       debug("Active Symbol Cleard For Expired Pending " + group.active_symbol_sell);
       group.active_symbol_sell = "";
@@ -1787,11 +1764,11 @@ void syncActiveSymbolOrders()
   }
 }
 
-bool hasActiveTransaction(string symbol)
+bool hasActiveTransaction(string symbol, int groupIndex)
 {
   if (StringLen(symbol) > 0)
   {
-    int ticket = selectOpenOrderTicketFor(symbol);
+    int ticket = selectOpenOrderTicketFor(symbol, groupIndex);
     // Has open order
     if (ticket > -1)
     {
@@ -1799,7 +1776,7 @@ bool hasActiveTransaction(string symbol)
     }
 
     // Has profit
-    if (symbolHasProfitInCurrentCrossing(symbol))
+    if (symbolHasProfitInCurrentCrossing(symbol, groupIndex))
     {
       return true;
     }
@@ -2020,7 +1997,7 @@ void drawArrowObj(long chartId, int shift, bool up = true, string id = "", int c
   ObjectSetInteger(chartId, id2, OBJPROP_WIDTH, 5);
 }
 
-void drawValidationObj(long chartId, int shift, bool up = true, bool valid = true, string id = "", int clr = C '9,255,9')
+void drawValidationObj(long chartId, int shift, bool up = true, bool valid = true, string id = "", int clr = C'9,255,9')
 {
   string symbol = ChartSymbol(chartId);
   datetime time = iTime(symbol, lower_timeframe, shift);
@@ -2107,18 +2084,18 @@ void simulate(string symbol, ENUM_TIMEFRAMES low_tf)
 
               OrderInfoResult orderCalculated;
 
-              double hsColor = C '60,167,17';
-              double lsColor = C '249,0,0';
+              double hsColor = C'60,167,17';
+              double lsColor = C'249,0,0';
               int orderColor = clrAqua;
-              double depthOfMoveColor = C '207,0,249';
+              double depthOfMoveColor = C'207,0,249';
 
               const int active = ActiveSignalForTest;
 
               if (i == active)
               {
-                lsColor = C '255,230,6';
+                lsColor = C'255,230,6';
                 orderColor = clrGreen;
-                depthOfMoveColor = C '249,0,0';
+                depthOfMoveColor = C'249,0,0';
                 drawVLine(chartId, item.maChangeShift, IntegerToString(item.maChangeShift) + "test", orderColor);
               }
 
@@ -2145,14 +2122,14 @@ void simulate(string symbol, ENUM_TIMEFRAMES low_tf)
 
               orderCalculated = validateOrderDistance(symbol, low_tf, maCross.orderEnvironment, signals, i);
 
-              drawValidationObj(chartId, item.maChangeShift, maCross.orderEnvironment == ENV_BUY, orderCalculated.valid, IntegerToString(item.maChangeShift), orderCalculated.valid ? C '9,255,9' : C '249,92,92');
+              drawValidationObj(chartId, item.maChangeShift, maCross.orderEnvironment == ENV_BUY, orderCalculated.valid, IntegerToString(item.maChangeShift), orderCalculated.valid ? C'9,255,9' : C'249,92,92');
 
               if (i == active && ShowTP_SL)
               {
                 string id = IntegerToString(i);
-                drawHLine(chartId, orderCalculated.orderPrice, "_order_" + id, orderCalculated.pending ? C '245,46,219' : C '0,191,73');
-                drawHLine(chartId, orderCalculated.slPrice, "_sl_" + id, C '255,5,5');
-                drawHLine(chartId, orderCalculated.tpPrice, "_tp_" + id, C '0,119,255');
+                drawHLine(chartId, orderCalculated.orderPrice, "_order_" + id, orderCalculated.pending ? C'245,46,219' : C'0,191,73');
+                drawHLine(chartId, orderCalculated.slPrice, "_sl_" + id, C'255,5,5');
+                drawHLine(chartId, orderCalculated.tpPrice, "_tp_" + id, C'0,119,255');
               }
             }
           }
