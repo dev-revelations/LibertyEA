@@ -174,32 +174,6 @@ void scanSymbolGroups()
       activeSymbolsListSell += "Group(" + IntegerToString(groupIdx) + ") = " + group.active_symbol_sell + "\n";
     }
 
-    ////////////// Define Prioritization For The Active Symbols //////////////
-
-    bool isActiveSymPendingSell = true;
-    int activeTicketSell = -1;
-    if (/* PrioritizeSameGroup && */ group.active_symbol_sell != "")
-    {
-      activeTicketSell = selectOpenOrderTicketFor(group.active_symbol_sell, groupIdx);
-      if (activeTicketSell > -1)
-      {
-        int OP = OrderType();
-        isActiveSymPendingSell = isOpPending(OP);
-      }
-    }
-
-    bool isActiveSymPendingBuy = true;
-    int activeTicketBuy = -1;
-    if (/* PrioritizeSameGroup && */ group.active_symbol_buy != "")
-    {
-      activeTicketBuy = selectOpenOrderTicketFor(group.active_symbol_buy, groupIdx);
-      if (activeTicketBuy > -1)
-      {
-        int OP = OrderType();
-        isActiveSymPendingBuy = isOpPending(OP);
-      }
-    }
-
     ////////////// Scanning Symbols In The Current Group //////////////
 
     for (int symbolIdx = 0; symbolIdx < group.symbols_count; symbolIdx++)
@@ -246,7 +220,7 @@ void scanSymbolGroups()
       */
       if ((status == STRATEGY_STATUS_IMMEDIATE_BUY || status == STRATEGY_STATUS_PENDING_BUY))
       {
-        if (group.active_symbol_buy == "" || (group.active_symbol_buy != "" && isActiveSymPendingBuy))
+        if (group.active_symbol_buy == "")
         {
           // group.active_symbol_buy = symbol;
           if (result.orderInfo.valid)
@@ -262,7 +236,7 @@ void scanSymbolGroups()
       }
       else if ((status == STRATEGY_STATUS_IMMEDIATE_SELL || status == STRATEGY_STATUS_PENDING_SELL))
       {
-        if (group.active_symbol_sell == "" || (group.active_symbol_sell != "" && isActiveSymPendingSell))
+        if (group.active_symbol_sell == "")
         {
           // group.active_symbol_sell = symbol;
           if (result.orderInfo.valid)
@@ -303,92 +277,66 @@ void scanSymbolGroups()
     if (group.active_strategy_sell.symbol != "")
       addOrderPriority(group.active_strategy_sell, OP_SELL);
 
-    if (orderPriorityListLength(OP_BUY) > 0)
-    {
-      StrategyResult sr = getPrioritizedOrderStrategyResult(OP_BUY);
-      if (sr.symbol != group.active_symbol_buy)
-      {
-        debug("Prioritized BUY Symbol = " + sr.symbol + " (Valid: " + (sr.orderInfo.valid ? "Yes" : "No") + ") " + " , Current Active BUY = " + group.active_symbol_buy);
-      }
-
-      /*  Conditions:
-          1- valid candidate
-          2- candidate should be different than current active symbol
-          3- Not having current active symbol (Empty Active Symbol Slot)
-           or active symbol is a pending order
-       */
-      bool isBuyAllowed = sr.orderInfo.valid && sr.symbol != group.active_symbol_buy && (group.active_symbol_buy == "" || isActiveSymPendingBuy); //!(!isActiveSymPendingBuy && !sr.orderInfo.pending));
-      if (isBuyAllowed)
-      {
-        bool canOpen = true;
-        if (activeTicketBuy > -1 && isActiveSymPendingBuy)
-        {
-          canOpen = OrderDelete(activeTicketBuy, clrAzure);
-          debug("Could Delete Existing Order ? " + (canOpen ? "Yes" : "No"));
-        }
-
-        // If Not have an already open order
-        canOpen = canOpen && (selectOpenOrderTicketFor(sr.symbol) <= 0);
-
-        if (canOpen)
-        {
-          debug("Prioritized order replacement (" + group.active_symbol_buy + " => " + sr.symbol + ")");
-          group.active_symbol_buy = sr.symbol;
-          group.active_strategy_buy = sr;
-          Order(sr.symbol, ENV_BUY, sr.orderInfo);
-        }
-        else
-        {
-          debug("Could not open order " + sr.symbol);
-        }
-      }
-    }
-
-    if (orderPriorityListLength(OP_SELL) > 0)
-    {
-      StrategyResult sr = getPrioritizedOrderStrategyResult(OP_SELL);
-      if (sr.symbol != group.active_symbol_sell)
-      {
-        debug("Prioritized BUY Symbol = " + sr.symbol + " (Valid: " + (sr.orderInfo.valid ? "Yes" : "No") + ") " + " , Current Active BUY = " + group.active_symbol_sell);
-      }
-
-      /*  Conditions:
-          1- valid candidate
-          2- candidate should be different than current active symbol
-          3- Not having current active symbol (Empty Active Symbol Slot)
-           or active symbol is a pending order
-       */
-
-      bool isSellAllowed = sr.orderInfo.valid && sr.symbol != group.active_symbol_sell && (group.active_symbol_sell == "" || isActiveSymPendingSell); //!(!isActiveSymPendingSell && !sr.orderInfo.pending));
-      if (isSellAllowed)
-      {
-        bool canOpen = true;
-
-        if (activeTicketSell > -1 && isActiveSymPendingSell)
-        {
-          canOpen = OrderDelete(activeTicketSell, clrAzure);
-          debug("Could Delete Existing Order ? " + (canOpen ? "Yes" : "No"));
-        }
-
-        // If Not have an already open order
-        canOpen = canOpen && (selectOpenOrderTicketFor(sr.symbol) <= 0);
-
-        if (canOpen)
-        {
-          debug("Prioritized order replacement (" + group.active_symbol_sell + " => " + sr.symbol + ")");
-          group.active_symbol_sell = sr.symbol;
-          group.active_strategy_sell = sr;
-          Order(sr.symbol, ENV_SELL, sr.orderInfo);
-        }
-        else
-        {
-          debug("Could not open order " + sr.symbol);
-        }
-      }
-    }
+    openPrioritizedOrdersFor(group, OP_BUY);
+    openPrioritizedOrdersFor(group, OP_SELL);
 
     GROUPS[groupIdx] = group; // Hatman bayad dobare set shavad ta taghirat emal shavad
   }
+
+  Comment(
+      "Current Session: " + IntegerToString(getSessionNumber(TimeCurrent())),
+      "\nActive Symbols (BUY):\n",
+      activeSymbolsListBuy,
+      "\nActive Symbols (SELL):\n",
+      activeSymbolsListSell);
+}
+
+void openPrioritizedOrdersFor(GroupStruct &group, int OP)
+{
+
+  string OP_string = OP == OP_BUY ? "BUY" : "SELL";
+
+  string active_symbol = OP == OP_BUY ? group.active_symbol_buy : group.active_symbol_sell;
+
+  OrderEnvironment env = OP == OP_BUY ? ENV_BUY : ENV_SELL;
+
+  if (orderPriorityListLength(OP) > 0)
+  {
+    StrategyResult prioritizedList[];
+    getPrioritizedOrderStrategyResult(OP_BUY, prioritizedList);
+
+    for (int i = 0; i < ArraySize(prioritizedList); i++)
+    {
+      StrategyResult sr = prioritizedList[i];
+
+      // If Not have an already open order
+      bool canOpen = (selectOpenOrderTicketFor(sr.symbol, group.groupIndex) <= 0);
+
+      if (canOpen)
+      {
+        Order(sr.symbol, env, sr.orderInfo, getMagicNumber(group.groupIndex));
+        // call syncing group orders here
+        if (hasActiveTransaction(sr.symbol, group.groupIndex) == true)
+        {
+          if (OP == OP_BUY)
+          {
+            group.active_symbol_buy = sr.symbol;
+            group.active_strategy_buy = sr;
+          }
+          else if (OP == OP_SELL)
+          {
+            group.active_symbol_sell = sr.symbol;
+            group.active_strategy_sell = sr;
+          }
+        }
+      }
+      else
+      {
+        debug("Could not open order " + sr.symbol);
+      }
+    }
+  }
+}
 
 StrategyResult runStrategy1(string symbol, ENUM_TIMEFRAMES lowTF, ENUM_TIMEFRAMES highTF, int groupIndex)
 {
@@ -400,7 +348,7 @@ StrategyResult runStrategy1(string symbol, ENUM_TIMEFRAMES lowTF, ENUM_TIMEFRAME
   if (maCross.found && !virtualMACross.found)
   {
 
-    const bool canCheckSignals = canCheckForSignals(symbol, maCross, groupIndex);
+    const bool canCheckSignals = !symbolHasProfitInCurrentCrossing(symbol, groupIndex, (int)maCross.crossTime);
 
     if (canCheckSignals)
     {
@@ -1189,12 +1137,15 @@ int Order(string symbol, OrderEnvironment orderEnv, OrderInfoResult &orderInfo, 
     // By default it set to buy
     OP = OP_BUY;
     double marketPrice = MarketInfo(symbol, MODE_ASK);
-    // Make sure it is a true pending, if marketPrice & suggested order price are the same
-    // it means it is already not a pending and it is an immediate order instead
-    orderInfo.pending = marketPrice != price;
+
     if (orderInfo.pending)
     {
       OP = marketPrice > price ? OP_BUYLIMIT : OP_BUYSTOP;
+    }
+    else
+    {
+      // Make sure price matches the market price
+      price = NormalizeDouble(marketPrice, digits);
     }
   }
   else if (orderEnv == ENV_SELL)
@@ -1202,12 +1153,16 @@ int Order(string symbol, OrderEnvironment orderEnv, OrderInfoResult &orderInfo, 
     // By default it set to sell
     OP = OP_SELL;
     double marketPrice = MarketInfo(symbol, MODE_BID);
-    // Make sure it is a true pending, if marketPrice & suggested order price are the same
-    // it means it is already not a pending and it is an immediate order instead
+
     orderInfo.pending = marketPrice != price;
     if (orderInfo.pending)
     {
       OP = marketPrice < price ? OP_SELLLIMIT : OP_SELLSTOP;
+    }
+    else
+    {
+      // Make sure price matches the market price
+      price = NormalizeDouble(marketPrice, digits);
     }
   }
   else
@@ -1240,76 +1195,6 @@ int Order(string symbol, OrderEnvironment orderEnv, OrderInfoResult &orderInfo, 
       Green);
 }
 
-bool canCheckForSignals(string symbol, HigherTFCrossCheckResult &maCross, int groupIndex)
-{
-  int total = OrdersTotal();
-  for (int pos = 0; pos < total; pos++)
-  {
-    if (OrderSelect(pos, SELECT_BY_POS) == false)
-      continue;
-
-    if (symbol == OrderSymbol() && OrderMagicNumber() == getMagicNumber(groupIndex))
-    {
-      int orderTime = (int)OrderOpenTime();
-      int cross_Time = (int)maCross.crossTime;
-
-      // Environment avaz shode ?
-      int OP = OrderType();
-
-      bool orderTypeDifferentThanCrossEnv = maCross.orderEnvironment == ENV_BUY && (OP == OP_SELL || OP == OP_SELLSTOP || OP == OP_SELLLIMIT);
-      orderTypeDifferentThanCrossEnv = orderTypeDifferentThanCrossEnv || (maCross.orderEnvironment == ENV_SELL && (OP == OP_BUY || OP == OP_BUYSTOP || OP == OP_BUYLIMIT));
-
-      // HigherTFCrossCheckResult virtualMACross = findHigherTimeFrameMACross(symbol, higher_timeframe, true);
-      // bool orderTypeSameAsVirtualCrossEnv = virtualMACross.orderEnvironment == ENV_BUY && (OP == OP_BUY || OP == OP_BUYSTOP || OP == OP_BUYLIMIT);
-      // orderTypeSameAsVirtualCrossEnv = orderTypeSameAsVirtualCrossEnv || (virtualMACross.orderEnvironment == ENV_SELL && (OP == OP_SELL || OP == OP_SELLSTOP || OP == OP_SELLLIMIT));
-
-      if (orderTime < cross_Time || orderTypeDifferentThanCrossEnv /* && !(virtualMACross.found) */)
-      {
-        if (OP == OP_BUY || OP == OP_SELL)
-        {
-          OrderClose(
-              OrderTicket(),                // ticket
-              OrderLots(),                  // volume
-              MarketInfo(symbol, MODE_ASK), // close price
-              3,                            // slippage
-              clrRed                        // color
-          );
-        }
-
-        if (OP == OP_BUYLIMIT || OP == OP_SELLLIMIT || OP == OP_BUYSTOP || OP == OP_SELLSTOP)
-        {
-          OrderDelete(OrderTicket(), clrAzure);
-        }
-
-        debug("Deleting Order Due To Change Of Environment " + symbol);
-
-        return true;
-      }
-      // else if (virtualMACross.found)
-      // {
-      //   debug("Ignoring Change Of Environment Deleting Order Due To virtual cross" + symbol);
-      // }
-
-      if (EnableBreakEven)
-      {
-        checkForBreakEven(symbol, pos);
-      }
-      // debug("Has Open order " + symbol);
-      // Symbol dar liste ordere baz peyda shode, banabarin az checke signale jadid jelogiri mikonim
-      return false;
-    }
-    // FileWrite(handle, OrderTicket(), OrderOpenPrice(), OrderOpenTime(), OrderSymbol(), OrderLots());
-  }
-
-  if (symbolHasProfitInCurrentCrossing(symbol, (int)maCross.crossTime))
-  {
-    // debug("Has profit in current crossing " + symbol);
-    return false;
-  }
-
-  return true;
-}
-
 int getMagicNumber(int groupIndex)
 {
   string magicString = IntegerToString(MagicNumber);
@@ -1331,6 +1216,9 @@ void processEAOrders()
       continue;
 
     if (deleteSellStopBuyStopIfHitStoploss())
+      continue;
+
+    if (deleteOrderIfEnvironmentChanged())
       continue;
 
     if (EnableBreakEven)
@@ -1396,27 +1284,14 @@ bool symbolHasProfitInCurrentCrossing(string symbol, int groupIndex, int crossTi
           // bar asase crossinge jadid khahad bud
           int orderTime = (int)OrderOpenTime();
           int cross_Time = (int)crossTime;
+          int orderSession = getSessionNumber(OrderOpenTime());
+          int currentSession = getSessionNumber(TimeCurrent());
+
           // Already made profit in the current crossing session
 
           bool orderHappenedAfterCrossing = orderTime > cross_Time;
 
-          return orderHappenedAfterCrossing;
-
-          // if (SingleChart)
-          // {
-          //   return orderHappenedAfterCrossing;
-          // }
-          // else
-          // {
-          //   int orderSession = getSessionNumber(OrderOpenTime());
-          //   int currentSession = getSessionNumber(TimeCurrent());
-
-          //   // Agar single chart nabud sessione jadid baraye symbole profit dar
-          //   // Zamani ast ke sessione trade ba sessione alan barabar nabashad
-          //   bool orderHappenedAfterCrossingAndInCurrentSession = orderHappenedAfterCrossing && sessionsEqual(orderSession, currentSession);
-
-          //   return orderHappenedAfterCrossingAndInCurrentSession;
-          // }
+          return orderHappenedAfterCrossing && sessionsEqual(orderSession, currentSession);
         }
       }
     }
@@ -1425,7 +1300,7 @@ bool symbolHasProfitInCurrentCrossing(string symbol, int groupIndex, int crossTi
   return false;
 }
 
-int selectOpenOrderTicketFor(string symbol, int groupIndex)
+int selectOpenOrderTicketFor(string symbol, int groupIndex, bool finalizedOrdersOnly = false)
 {
   int total = OrdersTotal();
   for (int pos = 0; pos < total; pos++)
@@ -1433,7 +1308,16 @@ int selectOpenOrderTicketFor(string symbol, int groupIndex)
     if (OrderSelect(pos, SELECT_BY_POS) == false)
       continue;
 
-    if (symbol == OrderSymbol() && OrderMagicNumber() == getMagicNumber(groupIndex))
+    bool found = symbol == OrderSymbol() && OrderMagicNumber() == getMagicNumber(groupIndex);
+
+    if (!finalizedOrdersOnly && found)
+    {
+      return OrderTicket();
+    }
+
+    found = found && (OrderType() == OP_BUY || OrderType() == OP_SELL);
+
+    if (finalizedOrdersOnly && found)
     {
       return OrderTicket();
     }
@@ -1497,7 +1381,7 @@ void checkForBreakEven(string symbol, int orderIndex)
 
 void initializeGroups()
 {
-  debug("==========================");
+  debug("============Initializing Groups==============");
   string groups_str_copy[];
   GROUPS_LENGTH = ArraySize(GROUPS_STR);
 
@@ -1535,62 +1419,63 @@ void initializeGroups()
 
     // Check mikonim agar zamane baz shodane EA orderhaye bazi dashtim ke marboot be symbol bud
     // An symbol ra be onvane active symbole marboot be group set mikonim
-    for (int symIndex = 0; symIndex < group.symbols_count; symIndex++)
-    {
-      string sym = group.symbols[symIndex];
-      int ticket = selectOpenOrderTicketFor(sym, group.groupIndex);
-      if (ticket > -1 && OrderSelect(ticket, SELECT_BY_TICKET) == true && sym == OrderSymbol() && OrderMagicNumber() == getMagicNumber(group.groupIndex))
-      {
-        int orderSession = getSessionNumber(OrderOpenTime());
-        int currentSession = getSessionNumber(TimeCurrent());
-        if (sessionsEqual(orderSession, currentSession))
-        {
-          int OP = OrderType();
-          if (OP == OP_SELL || OP == OP_SELLLIMIT || OP == OP_SELLSTOP)
-          {
-            group.active_symbol_sell = sym;
-            StrategyResult sr;
-            sr.symbol = sym;
-            group.active_strategy_sell = sr;
-          }
-          else if (OP == OP_BUY || OP == OP_BUYLIMIT || OP == OP_BUYSTOP)
-          {
-            group.active_symbol_buy = sym;
-            StrategyResult sr;
-            sr.symbol = sym;
-            group.active_strategy_buy = sr;
-          }
-          debug(" Has Open order " + sym);
-          break;
-        }
-      }
+    // for (int symIndex = 0; symIndex < group.symbols_count; symIndex++)
+    // {
+    //   string sym = group.symbols[symIndex];
+    //   int ticket = selectOpenOrderTicketFor(sym, group.groupIndex);
+    //   if (ticket > -1 && OrderSelect(ticket, SELECT_BY_TICKET) == true && sym == OrderSymbol() && OrderMagicNumber() == getMagicNumber(group.groupIndex))
+    //   {
+    //     int orderSession = getSessionNumber(OrderOpenTime());
+    //     int currentSession = getSessionNumber(TimeCurrent());
+    //     if (sessionsEqual(orderSession, currentSession))
+    //     {
+    //       int OP = OrderType();
+    //       if (OP == OP_SELL || OP == OP_SELLLIMIT || OP == OP_SELLSTOP)
+    //       {
+    //         group.active_symbol_sell = sym;
+    //         StrategyResult sr;
+    //         sr.symbol = sym;
+    //         group.active_strategy_sell = sr;
+    //       }
+    //       else if (OP == OP_BUY || OP == OP_BUYLIMIT || OP == OP_BUYSTOP)
+    //       {
+    //         group.active_symbol_buy = sym;
+    //         StrategyResult sr;
+    //         sr.symbol = sym;
+    //         group.active_strategy_buy = sr;
+    //       }
+    //       debug(" Has Open order " + sym);
+    //       break;
+    //     }
+    //   }
 
-      if (symbolHasProfitInCurrentCrossing(sym, group.groupIndex))
-      {
-        int orderSession = getSessionNumber(OrderOpenTime());
-        int currentSession = getSessionNumber(TimeCurrent());
+    //   if (symbolHasProfitInCurrentCrossing(sym, group.groupIndex))
+    //   {
+    //     int orderSession = getSessionNumber(OrderOpenTime());
+    //     int currentSession = getSessionNumber(TimeCurrent());
 
-        if (sessionsEqual(orderSession, currentSession))
-        {
-          int OP = OrderType();
-          if (OP == OP_SELL || OP == OP_SELLLIMIT || OP == OP_SELLSTOP)
-          {
-            group.active_symbol_sell = sym;
-          }
-          else if (OP == OP_BUY || OP == OP_BUYLIMIT || OP == OP_BUYSTOP)
-          {
-            group.active_symbol_buy = sym;
-          }
-          debug(" Had Profit " + sym);
-          break;
-        }
-      }
-    }
+    //     if (sessionsEqual(orderSession, currentSession))
+    //     {
+    //       int OP = OrderType();
+    //       if (OP == OP_SELL || OP == OP_SELLLIMIT || OP == OP_SELLSTOP)
+    //       {
+    //         group.active_symbol_sell = sym;
+    //       }
+    //       else if (OP == OP_BUY || OP == OP_BUYLIMIT || OP == OP_BUYSTOP)
+    //       {
+    //         group.active_symbol_buy = sym;
+    //       }
+    //       debug(" Had Profit " + sym);
+    //       break;
+    //     }
+    //   }
+
+    // }
 
     GROUPS[i] = group;
   }
 
-  debug("==========================");
+  syncActiveSymbolOrders();
 }
 
 void initializeMAs()
@@ -1738,6 +1623,53 @@ bool deleteSellStopBuyStopIfHitStoploss()
   return couldDelete;
 }
 
+bool deleteOrderIfEnvironmentChanged()
+{
+  int groupIndex = OrderMagicNumber() % 10;
+
+  string symbol = OrderSymbol();
+
+  if (OrderMagicNumber() == getMagicNumber(groupIndex))
+  {
+    HigherTFCrossCheckResult maCross = findHigherTimeFrameMACross(symbol, higher_timeframe);
+    if (maCross.found && (int)maCross.crossTime > -1)
+    {
+      int orderTime = (int)OrderOpenTime();
+      int cross_Time = (int)maCross.crossTime;
+
+      // Environment avaz shode ?
+      int OP = OrderType();
+
+      bool orderTypeDifferentThanCrossEnv = maCross.orderEnvironment == ENV_BUY && (OP == OP_SELL || OP == OP_SELLSTOP || OP == OP_SELLLIMIT);
+      orderTypeDifferentThanCrossEnv = orderTypeDifferentThanCrossEnv || (maCross.orderEnvironment == ENV_SELL && (OP == OP_BUY || OP == OP_BUYSTOP || OP == OP_BUYLIMIT));
+
+      if (orderTime < cross_Time || orderTypeDifferentThanCrossEnv /* && !(virtualMACross.found) */)
+      {
+        if (OP == OP_BUY || OP == OP_SELL)
+        {
+          OrderClose(
+              OrderTicket(),                // ticket
+              OrderLots(),                  // volume
+              MarketInfo(symbol, MODE_ASK), // close price
+              3,                            // slippage
+              clrRed                        // color
+          );
+        }
+
+        if (OP == OP_BUYLIMIT || OP == OP_SELLLIMIT || OP == OP_BUYSTOP || OP == OP_SELLSTOP)
+        {
+          OrderDelete(OrderTicket(), clrAzure);
+        }
+
+        debug("Deleting Order Due To Change Of Environment " + symbol);
+
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
 void syncActiveSymbolOrders()
 {
   for (int groupIdx = 0; groupIdx < GROUPS_LENGTH; groupIdx++)
@@ -1746,7 +1678,7 @@ void syncActiveSymbolOrders()
 
     if (group.active_symbol_buy != "" && hasActiveTransaction(group.active_symbol_buy, groupIdx) == false)
     {
-      debug("Active Symbol Cleard For Expired Pending " + group.active_symbol_buy);
+      debug("Group " + IntegerToString(groupIdx) + " (BUY) Active Symbol Cleard! No Active Transaction " + group.active_symbol_buy);
       group.active_symbol_buy = "";
       StrategyResult sr;
       group.active_strategy_buy = sr;
@@ -1754,13 +1686,89 @@ void syncActiveSymbolOrders()
 
     if (group.active_symbol_sell != "" && hasActiveTransaction(group.active_symbol_sell, groupIdx) == false)
     {
-      debug("Active Symbol Cleard For Expired Pending " + group.active_symbol_sell);
+      debug("Group " + IntegerToString(groupIdx) + " (SELL) Active Symbol Cleard! No Active Transaction" + group.active_symbol_sell);
       group.active_symbol_sell = "";
       StrategyResult sr;
       group.active_strategy_sell = sr;
     }
 
+    // Check to find unset active symbols
+    for (int symIndex = 0; symIndex < group.symbols_count; symIndex++)
+    {
+      string sym = group.symbols[symIndex];
+
+      if (hasActiveTransaction(sym, groupIdx) == true)
+      {
+        OrderInfoResult orderInfo;
+        orderInfo.orderPrice = OrderOpenPrice();
+        orderInfo.originalPrice = OrderOpenPrice();
+        orderInfo.slPrice = OrderStopLoss();
+        orderInfo.tpPrice = OrderTakeProfit();
+        orderInfo.pending = isOpPending(OrderType());
+        orderInfo.originalPrice = orderInfo.pending ? orderInfo.orderPrice : -1;
+        orderInfo.valid = true;
+
+        if (OrderType() == OP_BUY && group.active_symbol_buy == "")
+        {
+          debug("Setting Active Symbol During Synchronization " + sym);
+          group.active_symbol_buy = sym;
+          StrategyResult sr;
+          sr.symbol = sym;
+          sr.orderInfo = orderInfo;
+          group.active_strategy_buy = sr;
+        }
+        else if (OrderType() == OP_SELL && group.active_symbol_sell == "")
+        {
+          debug("Setting Active Symbol During Synchronization  " + sym);
+          group.active_symbol_sell = sym;
+          StrategyResult sr;
+          sr.symbol = sym;
+          sr.orderInfo = orderInfo;
+          group.active_strategy_sell = sr;
+        }
+      }
+    }
+
+    // Delete group pendings if we have active symbols
+    for (int symIndex = 0; symIndex < group.symbols_count; symIndex++)
+    {
+      string sym = group.symbols[symIndex];
+
+      if (sym != group.active_symbol_sell && sym != group.active_symbol_buy && selectOpenOrderTicketFor(sym, groupIdx) > -1)
+      {
+        int OP = OrderType();
+        bool shouldDelete = ((OP == OP_BUYSTOP || OP == OP_BUYLIMIT) && group.active_symbol_buy != "");
+        shouldDelete = shouldDelete || ((OP == OP_SELLSTOP || OP == OP_SELLLIMIT) && group.active_symbol_sell != "");
+        if (shouldDelete)
+        {
+          OrderDelete(OrderTicket(), clrAzure);
+          debug("Active Symbol Found - Deleting Pending: Group" + IntegerToString(groupIdx) + " (" + getOpName(OP) + ") " + sym);
+        }
+      }
+    }
+
     GROUPS[groupIdx] = group;
+  }
+}
+
+string getOpName(int OP)
+{
+  switch (OP)
+  {
+  case OP_BUY:
+    return "BUY";
+  case OP_SELL:
+    return "SELL";
+  case OP_BUYSTOP:
+    return "BUY_STOP";
+  case OP_BUYLIMIT:
+    return "BUY_LIMIT";
+  case OP_SELLSTOP:
+    return "SELL_STOP";
+  case OP_SELLLIMIT:
+    return "SELL_LIMIT";
+  default:
+    return "NONE";
   }
 }
 
@@ -1768,7 +1776,7 @@ bool hasActiveTransaction(string symbol, int groupIndex)
 {
   if (StringLen(symbol) > 0)
   {
-    int ticket = selectOpenOrderTicketFor(symbol, groupIndex);
+    int ticket = selectOpenOrderTicketFor(symbol, groupIndex, true);
     // Has open order
     if (ticket > -1)
     {

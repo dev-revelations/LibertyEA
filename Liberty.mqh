@@ -184,64 +184,80 @@ int orderPriorityListLength(int OP)
 }
 
 // This function reduces 2 lists to one list to be processed
-StrategyResult getPrioritizedOrderStrategyResult(int OP)
+void getPrioritizedOrderStrategyResult(int OP, StrategyResult &prioritizedListResult[])
 {
     int targetCount = orderPriorityListLength(OP);
     // Print("Prioriti List Type: ", OP == OP_BUY ? "Buy" : "Sell");
-    return OP == OP_BUY ? prioritizeOrders(BUY_PRIORITY_CHECK_LIST, targetCount) : prioritizeOrders(SELL_PRIORITY_CHECK_LIST, targetCount);
+    if (OP == OP_BUY)
+    {
+        prioritizeOrders(BUY_PRIORITY_CHECK_LIST, targetCount, prioritizedListResult);
+    }
+    else
+    {
+        prioritizeOrders(SELL_PRIORITY_CHECK_LIST, targetCount, prioritizedListResult);
+    }
 }
 
-StrategyResult prioritizeOrders(StrategyResult &list[], int count)
+void prioritizeOrders(StrategyResult &list[], int count, StrategyResult &prioritizedListResult[])
 {
-    StrategyResult result;
 
     // This means we only have one immediate option and should return
     if (count == 1)
     {
-        return list[0];
+        ArrayResize(prioritizedListResult, 1);
+        prioritizedListResult[0] = list[0];
+        return;
     }
 
     /* Olaviatha:
         1- Immediate be pending tarjih dade mishavad
         2- Beyne 2 immediate olaviat ba moredi ast ke stoplosse kuchecktari dashte bashad
     */
-
+    // Looking for immediates and prioritize them
+    StrategyResult result;
+    bool immediateFound = false;
     for (int i = 0; i < count; i++)
     {
         StrategyResult item = list[i];
         if (item.orderInfo.valid)
         {
-            if (result.symbol == "")
+            Print(item.symbol, " From Prioritization List");
+
+            // One is immediate
+            if (result.orderInfo.pending && !item.orderInfo.pending)
             {
                 result = item;
+                immediateFound = true;
                 continue;
             }
-            else
-            {
-                Print(item.symbol, " From Prioritization List");
 
-                // One is immediate
-                if (result.orderInfo.pending && !item.orderInfo.pending)
+            // Both are immediates
+            if ((!result.orderInfo.pending && !item.orderInfo.pending))
+            {
+                // Check mikonim har kodam stoplosseshan chanta average candle size ast?
+                const double currentSlSize = MathAbs(result.orderInfo.orderPrice - result.orderInfo.slPrice) / result.orderInfo.averageCandleSize;
+                const double itemSlSize = MathAbs(item.orderInfo.orderPrice - item.orderInfo.slPrice) / item.orderInfo.averageCandleSize;
+                if (itemSlSize > currentSlSize)
                 {
                     result = item;
+                    immediateFound = true;
                     continue;
-                }
-
-                // Both are immediate or both are pendings
-                if ((!result.orderInfo.pending && !item.orderInfo.pending) /* || (result.orderInfo.pending && item.orderInfo.pending) */)
-                {
-                    // Check mikonim har kodam stoplosseshan chanta average candle size ast?
-                    const double currentSlSize = MathAbs(result.orderInfo.orderPrice - result.orderInfo.slPrice) / result.orderInfo.averageCandleSize;
-                    const double itemSlSize = MathAbs(item.orderInfo.orderPrice - item.orderInfo.slPrice) / item.orderInfo.averageCandleSize;
-                    if (itemSlSize > currentSlSize)
-                    {
-                        result = item;
-                        continue;
-                    }
                 }
             }
         }
     }
 
-    return result;
+    if (immediateFound)
+    {
+        ArrayResize(prioritizedListResult, 1);
+        prioritizedListResult[0] = result;
+        return;
+    }
+
+    int listLength = ArraySize(list);
+    ArrayResize(prioritizedListResult, listLength);
+    for (int index = 0; index < listLength; index++)
+    {
+        prioritizedListResult[index] = list[index];
+    }
 }
