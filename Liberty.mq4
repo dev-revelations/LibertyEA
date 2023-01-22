@@ -26,7 +26,7 @@ extern ENUM_TIMEFRAMES higher_timeframe = PERIOD_H4;                     // High
 extern bool Enable_MA_Closing = false;                                   // Enable MA Closing Detection
 extern double MA_Closing_AverageCandleSize_Ratio = 2;                    // MA closing ratio in Average Candle Size
 extern int MA_Closing_Delay = 2;                                         // Number of higher TF candles should wait
-extern double MA_Touch_Thickness_Ratio = 0.4;                            // Higher MA Touch Thickness Ratio in Average Candle Size
+extern double MA_Touch_Thickness_Ratio = 0.2;                            // Higher MA Touch Thickness Ratio in Average Candle Size
 extern string _separator1_1 = "======================================="; // ===== Lower Timeframe =====
 extern ENUM_TIMEFRAMES lower_timeframe = PERIOD_M5;                      // Lower Timeframe (Never select current)
 extern bool OnlyMaCandleBreaks = true;                                   // Shohld candle break MA?
@@ -446,7 +446,7 @@ StrategyResult runStrategy1(string symbol, ENUM_TIMEFRAMES lowTF, ENUM_TIMEFRAME
 
       int firstAreaTouchShift = findAreaTouch(symbol, highTF, maCross.orderEnvironment, maCross.crossCandleShift, lowTF);
 
-      if (firstAreaTouchShift > 0 && maCross.orderEnvironment != ENV_NONE)
+      if (firstAreaTouchShift >= 0 && maCross.orderEnvironment != ENV_NONE)
       {
         SignalResult signals[];
         listSignals(signals, symbol, lowTF, maCross.orderEnvironment, firstAreaTouchShift);
@@ -454,53 +454,32 @@ StrategyResult runStrategy1(string symbol, ENUM_TIMEFRAMES lowTF, ENUM_TIMEFRAME
         int signalsCount = ArraySize(signals);
         if (signalsCount > 0)
         {
-          int lastSignalIndex = signalsCount - 1;
-          SignalResult lastSignal = signals[lastSignalIndex];
-          // Validate Signal
-          OrderInfoResult orderCalculated = signalToOrderInfo(symbol, lowTF, maCross.orderEnvironment, lastSignal);
-          orderCalculated = validateOrderDistance(symbol, lowTF, maCross.orderEnvironment, signals, lastSignalIndex);
-          if (lastSignal.maChangeShift >= 0 && lastSignal.maChangeShift <= 2 && orderCalculated.valid)
+
+          OrderInfoResult entry = getSymbolEntry(symbol, lowTF, firstAreaTouchShift, maCross, signals);
+          // if (entry.valid && trade && (allowedEnv == ENV_BOTH || allowedEnv == maCross.orderEnvironment))
+          // {
+          //   Order(symbol, maCross.orderEnvironment, entry);
+          //   long chartId = findSymbolChart(symbol);
+          //   drawVLine(chartId, 0, "Order_" + IntegerToString(lastSignal.maChangeShift), clrOrange);
+          //   // breakPoint();
+          // }
+
+          // Preparing the strategy result
+          if (maCross.orderEnvironment == ENV_SELL)
           {
-            // open signal
-            if (!orderCalculated.pending)
-            {
-              if (maCross.orderEnvironment == ENV_SELL)
-              {
-                orderCalculated = calculeOrderPlace(symbol, lowTF, maCross.orderEnvironment, 0, lastSignal.highestShift, MarketInfo(symbol, MODE_BID), false);
-                // orderCalculated.orderPrice = ;
-              }
-              else if (maCross.orderEnvironment == ENV_BUY)
-              {
-                // orderCalculated.orderPrice = MarketInfo(symbol, MODE_ASK);
-                orderCalculated = calculeOrderPlace(symbol, lowTF, maCross.orderEnvironment, 0, lastSignal.lowestShift, MarketInfo(symbol, MODE_ASK), false);
-              }
-              orderCalculated.pending = false;
-            }
-
-            if (trade && (allowedEnv == ENV_BOTH || allowedEnv == maCross.orderEnvironment))
-            {
-              Order(symbol, maCross.orderEnvironment, orderCalculated);
-              long chartId = findSymbolChart(symbol);
-              drawVLine(chartId, 0, "Order_" + IntegerToString(lastSignal.maChangeShift), clrOrange);
-              // breakPoint();
-            }
-
-            // Preparing the strategy result
-            if (maCross.orderEnvironment == ENV_SELL)
-            {
-              result.status = orderCalculated.pending == false ? STRATEGY_STATUS_IMMEDIATE_SELL : STRATEGY_STATUS_PENDING_SELL;
-            }
-            else if (maCross.orderEnvironment == ENV_BUY)
-            {
-              result.status = orderCalculated.pending == false ? STRATEGY_STATUS_IMMEDIATE_BUY : STRATEGY_STATUS_PENDING_BUY;
-            }
-
-            result.orderInfo = orderCalculated;
-            result.orderInfo.valid = true;
-            result.signal = lastSignal;
-
-            return result;
+            result.status = entry.pending == false ? STRATEGY_STATUS_IMMEDIATE_SELL : STRATEGY_STATUS_PENDING_SELL;
           }
+          else if (maCross.orderEnvironment == ENV_BUY)
+          {
+            result.status = entry.pending == false ? STRATEGY_STATUS_IMMEDIATE_BUY : STRATEGY_STATUS_PENDING_BUY;
+          }
+
+          result.orderInfo = entry;
+
+          if (!entry.valid)
+            result.status = STRATEGY_STATUS_CHECKING_SIGNALS;
+
+          return result;
         }
       }
     }
@@ -509,6 +488,68 @@ StrategyResult runStrategy1(string symbol, ENUM_TIMEFRAMES lowTF, ENUM_TIMEFRAME
   {
     // debug(symbol + " symbol being ignored, a virtual crossing has found in current higher timeframe candle");
     // drawVLine(findSymbolChart(symbol), virtualMACross.crossCandleShift, "virtual_cross", clrAqua);
+  }
+
+  return result;
+}
+
+/// @brief Checks for any available tradable signal in the symbol
+/// @param symbol
+/// @param currentTF
+/// @param firstAreaTouchShift
+/// @param maCross
+/// @param signals
+/// @return The order that we can place for the given symbol. If no order found it will return an invalid order.
+OrderInfoResult getSymbolEntry(string symbol, ENUM_TIMEFRAMES currentTF, int firstAreaTouchShift, HigherTFCrossCheckResult &maCross, SignalResult &signals[])
+{
+  OrderInfoResult result;
+
+  double price = maCross.orderEnvironment == ENV_SELL ? MarketInfo(symbol, MODE_BID) : MarketInfo(symbol, MODE_ASK);
+
+  int signalsCount = ArraySize(signals);
+  int lastSignalIndex = signalsCount - 1;
+  if (signalsCount > 0)
+  {
+    SignalResult lastSignal = signals[lastSignalIndex];
+    // Validate Signal
+    OrderInfoResult orderCalculated = signalToOrderInfo(symbol, currentTF, maCross.orderEnvironment, lastSignal);
+    orderCalculated = validateOrderDistance(symbol, currentTF, maCross.orderEnvironment, signals, lastSignalIndex);
+    // If last signal is hapenning now
+    if (lastSignal.maChangeShift >= 0 && lastSignal.maChangeShift <= 2 && orderCalculated.valid)
+    {
+      // open signal
+      if (!orderCalculated.pending)
+      {
+        if (maCross.orderEnvironment == ENV_SELL)
+        {
+          orderCalculated = calculeOrderPlace(symbol, currentTF, maCross.orderEnvironment, 0, lastSignal.highestShift, MarketInfo(symbol, MODE_BID), false);
+          // orderCalculated.orderPrice = ;
+        }
+        else if (maCross.orderEnvironment == ENV_BUY)
+        {
+          // orderCalculated.orderPrice = MarketInfo(symbol, MODE_ASK);
+          orderCalculated = calculeOrderPlace(symbol, currentTF, maCross.orderEnvironment, 0, lastSignal.lowestShift, MarketInfo(symbol, MODE_ASK), false);
+        }
+        orderCalculated.pending = false;
+      }
+
+      result = orderCalculated;
+    }
+    else if (lastSignal.maChangeShift > 2)
+    {
+      // if last signal is not hapenning now, find the latest valid signal and set a pending order for it
+      int latestValidSignalIndex = findMostValidSignal(symbol, currentTF, maCross.orderEnvironment, signals);
+      if (latestValidSignalIndex > -1)
+      {
+        double high = iHigh(symbol, currentTF, 0);
+        double low = iLow(symbol, currentTF, 0);
+        SignalResult latestValidSignal = signals[latestValidSignalIndex];
+        OrderInfoResult latestValidOrder = signalToOrderInfo(symbol, currentTF, maCross.orderEnvironment, latestValidSignal);
+        latestValidOrder.valid = maCross.orderEnvironment == ENV_SELL ? (price > latestValidOrder.tpPrice && high < latestValidOrder.slPrice) : (price < latestValidOrder.tpPrice && low > latestValidOrder.slPrice);
+        latestValidOrder.pending = true;
+        result = latestValidOrder;
+      }
+    }
   }
 
   return result;
@@ -628,27 +669,27 @@ bool isAreaTouched(string symbol, ENUM_TIMEFRAMES higherTF, OrderEnvironment ord
 
   // if (actualHigherShift >= 0)
   // {
-    double h4_ma5 = getLibertyMA(symbol, 5, shift); // getMA(symbol, higherTF, 5, actualHigherShift);
+  double h4_ma5 = getLibertyMA(symbol, 5, shift); // getMA(symbol, higherTF, 5, actualHigherShift);
   double h4_ma5_thickness = averageCandleSize(symbol, lower_tf, shift, AverageCandleSizePeriod) * MA_Touch_Thickness_Ratio;
-    if (orderEnv == ENV_SELL)
-    {
+  if (orderEnv == ENV_SELL)
+  {
     h4_ma5 -= h4_ma5_thickness;
-      double m5_high = iHigh(symbol, lower_tf, shift);
-      if (m5_high >= h4_ma5)
-      {
-        return true;
-      }
-    }
-
-    if (orderEnv == ENV_BUY)
+    double m5_high = iHigh(symbol, lower_tf, shift);
+    if (m5_high >= h4_ma5)
     {
-    h4_ma5 += h4_ma5_thickness;
-      double m5_low = iLow(symbol, lower_tf, shift);
-      if (m5_low <= h4_ma5)
-      {
-        return true;
-      }
+      return true;
     }
+  }
+
+  if (orderEnv == ENV_BUY)
+  {
+    h4_ma5 += h4_ma5_thickness;
+    double m5_low = iLow(symbol, lower_tf, shift);
+    if (m5_low <= h4_ma5)
+    {
+      return true;
+    }
+  }
   // }
   return false;
 }
@@ -1005,27 +1046,9 @@ OrderInfoResult validateOrderDistance(string symbol, ENUM_TIMEFRAMES tf, OrderEn
   if (signalIndexToValidate > 0)
   {
     // Find highest/lowest entry price in the past
-    SignalResult mostValidEntrySignal = signals[0];
+    int place = findMostValidSignal(symbol, tf, orderEnv, signals, signalIndexToValidate);
+    SignalResult mostValidEntrySignal = signals[place];
     OrderInfoResult mostValidEntry = signalToOrderInfo(symbol, tf, orderEnv, mostValidEntrySignal);
-    int place = 0;
-    for (int i = 0; i < signalIndexToValidate; i++)
-    {
-      SignalResult item = signals[i];
-      OrderInfoResult signalOrderInfo = signalToOrderInfo(symbol, tf, orderEnv, item);
-
-      if (orderEnv == ENV_SELL && signalOrderInfo.originalPrice > mostValidEntry.originalPrice)
-      {
-        mostValidEntrySignal = item;
-        mostValidEntry = signalOrderInfo;
-        place = i;
-      }
-      else if (orderEnv == ENV_BUY && signalOrderInfo.originalPrice < mostValidEntry.originalPrice)
-      {
-        mostValidEntrySignal = item;
-        mostValidEntry = signalOrderInfo;
-        place = i;
-      }
-    }
 
     if (mostValidEntry.orderPrice > -1)
     {
@@ -1081,6 +1104,38 @@ OrderInfoResult validateOrderDistance(string symbol, ENUM_TIMEFRAMES tf, OrderEn
   }
 
   return indexOrderInfo;
+}
+
+int findMostValidSignal(string symbol, ENUM_TIMEFRAMES tf, OrderEnvironment orderEnv, SignalResult &signals[], int limitIndex = -1)
+{
+  // Find highest/lowest entry price in the past
+  if (limitIndex <= -1)
+  {
+    limitIndex = ArraySize(signals);
+  }
+  SignalResult mostValidEntrySignal = signals[0];
+  OrderInfoResult mostValidEntry = signalToOrderInfo(symbol, tf, orderEnv, mostValidEntrySignal);
+  int place = 0;
+  for (int i = 0; i < limitIndex; i++)
+  {
+    SignalResult item = signals[i];
+    OrderInfoResult signalOrderInfo = signalToOrderInfo(symbol, tf, orderEnv, item);
+
+    if (orderEnv == ENV_SELL && signalOrderInfo.originalPrice > mostValidEntry.originalPrice)
+    {
+      mostValidEntrySignal = item;
+      mostValidEntry = signalOrderInfo;
+      place = i;
+    }
+    else if (orderEnv == ENV_BUY && signalOrderInfo.originalPrice < mostValidEntry.originalPrice)
+    {
+      mostValidEntrySignal = item;
+      mostValidEntry = signalOrderInfo;
+      place = i;
+    }
+  }
+
+  return place;
 }
 
 double averageCandleSize(string symbol, ENUM_TIMEFRAMES tf, int startShift, int period)
@@ -1153,26 +1208,44 @@ double GetLotSize(string symbol, double riskPercent, double price, double slPric
 
 int Order(string symbol, OrderEnvironment orderEnv, OrderInfoResult &orderInfo, string comment = "")
 {
-
   int expiration = 0;
 
   int OP = 0;
 
+  const int digits = (int)MarketInfo(symbol, MODE_DIGITS);
+
+  double price = NormalizeDouble(orderInfo.orderPrice, digits);
+
   if (orderEnv == ENV_BUY)
   {
-    OP = orderInfo.pending ? OP_BUYLIMIT : OP_BUY;
+    // By default it set to buy
+    OP = OP_BUY;
+    double marketPrice = MarketInfo(symbol, MODE_ASK);
+    // Make sure it is a true pending, if marketPrice & suggested order price are the same
+    // it means it is already not a pending and it is an immediate order instead
+    orderInfo.pending = marketPrice != price;
+    if (orderInfo.pending)
+    {
+      OP = marketPrice > price ? OP_BUYLIMIT : OP_BUYSTOP;
+    }
   }
   else if (orderEnv == ENV_SELL)
   {
-    OP = orderInfo.pending ? OP_SELLLIMIT : OP_SELL;
+    // By default it set to sell
+    OP = OP_SELL;
+    double marketPrice = MarketInfo(symbol, MODE_BID);
+    // Make sure it is a true pending, if marketPrice & suggested order price are the same
+    // it means it is already not a pending and it is an immediate order instead
+    orderInfo.pending = marketPrice != price;
+    if (orderInfo.pending)
+    {
+      OP = marketPrice < price ? OP_SELLLIMIT : OP_SELLSTOP;
+    }
   }
   else
   {
     return -1;
   }
-
-  const int digits = (int)MarketInfo(symbol, MODE_DIGITS);
-  double price = NormalizeDouble(orderInfo.orderPrice, digits);
 
   double SL = NormalizeDouble(orderInfo.slPrice, digits);
 
@@ -1272,7 +1345,6 @@ bool canCheckForSignals(string symbol, HigherTFCrossCheckResult &maCross)
 /////////////////////////// Order Management Helpers ///////////////////////////
 void processEAOrders()
 {
-
   int total = OrdersTotal();
   for (int pos = 0; pos < total; pos++)
   {
@@ -1280,6 +1352,9 @@ void processEAOrders()
       continue;
 
     if (deletePendingIfExceededTPThreshold())
+      continue;
+
+    if (deleteSellStopBuyStopIfHitStoploss())
       continue;
 
     if (EnableBreakEven)
@@ -1633,11 +1708,53 @@ bool deletePendingIfExceededTPThreshold()
     couldDelete = OrderDelete(OrderTicket(), clrAzure);
     if (couldDelete)
     {
-      debug("Pending Exceeded TP Threshold: Deleted Pending For " + symbol);
+      debug("Price Exceeded Pending TP Threshold: Deleted Pending For " + symbol);
     }
     else
     {
-      debug("Pending Exceeded TP Threshold: Could not delete pending for " + symbol);
+      debug("Price Exceeded Pending TP Threshold: Could not delete pending for " + symbol);
+    }
+  }
+
+  return couldDelete;
+}
+
+bool deleteSellStopBuyStopIfHitStoploss()
+{
+  string symbol = OrderSymbol();
+  int OP = OrderType();
+  double SL = OrderStopLoss();
+
+  bool typeSell = OP == OP_SELLSTOP;
+  bool typeBuy = OP == OP_BUYSTOP;
+
+  bool shouldDelete = false;
+
+  if (typeSell)
+  {
+    double bid = MarketInfo(symbol, MODE_BID);
+    shouldDelete = bid >= SL;
+  }
+  else if (typeBuy)
+  {
+    double ask = MarketInfo(symbol, MODE_ASK);
+    shouldDelete = ask <= SL;
+  }
+
+  bool couldDelete = false;
+
+  if (shouldDelete)
+  {
+    couldDelete = OrderDelete(OrderTicket(), clrAzure);
+
+    string typeStr = typeSell ? "SellStop" : "BuyStop";
+    if (couldDelete)
+    {
+      debug("Price Hit " + typeStr + " SL : Deleted Pending For " + symbol);
+    }
+    else
+    {
+      debug("Price Hit " + typeStr + " SL : Could not delete pending for " + symbol);
     }
   }
 

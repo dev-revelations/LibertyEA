@@ -92,7 +92,6 @@ struct StrategyResult
 {
     StrategyStatus status;
     OrderInfoResult orderInfo;
-    SignalResult signal;
     string symbol;
     HigherTFCrossCheckResult maCross;
 
