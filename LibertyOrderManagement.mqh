@@ -121,6 +121,25 @@ int selectOpenOrderTicketFor(string symbol, int groupIndex, bool finalizedOrders
     return -1;
 }
 
+bool hasActiveOpenSymbol(int groupIndex, int OP)
+{
+    int total = OrdersTotal();
+    for (int pos = 0; pos < total; pos++)
+    {
+        if (OrderSelect(pos, SELECT_BY_POS) == false)
+            continue;
+
+        int orderGroupIndex = OrderMagicNumber() % 10;
+
+        if (groupIndex == orderGroupIndex && OrderType() == OP)
+        {
+            return true;
+        }
+    }
+
+    return false;
+}
+
 void checkForBreakEven(string symbol, int orderIndex)
 {
     if (OrderSelect(orderIndex, SELECT_BY_POS) == false)
