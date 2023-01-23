@@ -117,9 +117,8 @@ void prioritizeOrders(StrategyResult &list[], int count, StrategyResult &priorit
         return;
     }
 
-    int listLength = ArraySize(list);
-    ArrayResize(prioritizedListResult, listLength);
-    for (int index = 0; index < listLength; index++)
+    ArrayResize(prioritizedListResult, count);
+    for (int index = 0; index < count; index++)
     {
         prioritizedListResult[index] = list[index];
     }
@@ -137,7 +136,7 @@ void openPrioritizedOrdersFor(GroupStruct &group, int OP)
     if (orderPriorityListLength(OP) > 0)
     {
         StrategyResult prioritizedList[];
-        getPrioritizedOrderStrategyResult(OP_BUY, prioritizedList);
+        getPrioritizedOrderStrategyResult(OP, prioritizedList);
 
         for (int i = 0; i < ArraySize(prioritizedList); i++)
         {
@@ -163,10 +162,6 @@ void openPrioritizedOrdersFor(GroupStruct &group, int OP)
                         group.active_strategy_sell = sr;
                     }
                 }
-            }
-            else
-            {
-                debug("Could not open order " + sr.symbol);
             }
         }
     }

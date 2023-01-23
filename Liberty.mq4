@@ -212,7 +212,7 @@ void scanSymbolGroups()
           if (result.orderInfo.valid)
           {
             addOrderPriority(result, OP_BUY);
-            debug("Candid added to priority list " + symbol);
+            // debug("Candid added to priority list (BUY)" + symbol);
           }
           else
           {
@@ -228,7 +228,7 @@ void scanSymbolGroups()
           if (result.orderInfo.valid)
           {
             addOrderPriority(result, OP_SELL);
-            debug("Candid added to priority list " + symbol);
+            // debug("Candid added to priority list (SELL)" + symbol);
           }
           else
           {
@@ -265,7 +265,7 @@ void scanSymbolGroups()
 
     openPrioritizedOrdersFor(group, OP_BUY);
     openPrioritizedOrdersFor(group, OP_SELL);
-
+    
     GROUPS[groupIdx] = group; // Hatman bayad dobare set shavad ta taghirat emal shavad
   }
 
@@ -399,8 +399,8 @@ OrderInfoResult getSymbolEntry(string symbol, ENUM_TIMEFRAMES currentTF, int fir
         double high = iHigh(symbol, currentTF, 0);
         double low = iLow(symbol, currentTF, 0);
         SignalResult latestValidSignal = signals[latestValidSignalIndex];
-        OrderInfoResult latestValidOrder = signalToOrderInfo(symbol, currentTF, maCross.orderEnvironment, latestValidSignal);
-        latestValidOrder.valid = maCross.orderEnvironment == ENV_SELL ? (price > latestValidOrder.tpPrice && high < latestValidOrder.slPrice) : (price < latestValidOrder.tpPrice && low > latestValidOrder.slPrice);
+        OrderInfoResult latestValidOrder = validateOrderDistanceToCurrentCandle(symbol, currentTF, maCross.orderEnvironment, latestValidSignal);
+        latestValidOrder.valid = latestValidOrder.valid && (maCross.orderEnvironment == ENV_SELL ? (price > latestValidOrder.tpPrice && high < latestValidOrder.slPrice) : (price < latestValidOrder.tpPrice && low > latestValidOrder.slPrice));
         latestValidOrder.pending = true;
         result = latestValidOrder;
       }
@@ -919,7 +919,7 @@ OrderInfoResult validateOrderDistance(string symbol, ENUM_TIMEFRAMES tf, OrderEn
       else if (orderEnv == ENV_BUY)
       {
         int highestCandleFromMostValid = iHighest(symbol, tf, MODE_HIGH, candlesCountFromMostValidEntry, signal.maChangeShift);
-        double highestPrice = iLow(symbol, tf, highestCandleFromMostValid);
+        double highestPrice = iHigh(symbol, tf, highestCandleFromMostValid);
         isValidPriceDistance = (indexOrderInfo.originalPrice < mostValidEntry.tpPrice) && (highestPrice < mostValidEntry.tpPrice);
       }
 
@@ -959,6 +959,42 @@ OrderInfoResult validateOrderDistance(string symbol, ENUM_TIMEFRAMES tf, OrderEn
   }
 
   return indexOrderInfo;
+}
+
+OrderInfoResult validateOrderDistanceToCurrentCandle(string symbol, ENUM_TIMEFRAMES tf, OrderEnvironment orderEnv, SignalResult &signal)
+{
+
+  // Find highest/lowest entry price in the past
+  OrderInfoResult entry = signalToOrderInfo(symbol, tf, orderEnv, signal);
+
+  entry.valid = false;
+
+  if (entry.orderPrice > -1)
+  {
+    bool isValidPriceDistance = false;
+    int candlesCountFromMostValidEntry = MathAbs(signal.maChangeShift + 1);
+
+    if (orderEnv == ENV_SELL)
+    {
+      int lowestCandleFromMostValid = iLowest(symbol, tf, MODE_LOW, candlesCountFromMostValidEntry, 0);
+      double lowestPrice = iLow(symbol, tf, lowestCandleFromMostValid);
+      isValidPriceDistance = (lowestPrice > entry.tpPrice);
+    }
+    else if (orderEnv == ENV_BUY)
+    {
+      int highestCandleFromMostValid = iHighest(symbol, tf, MODE_HIGH, candlesCountFromMostValidEntry, 0);
+      double highestPrice = iHigh(symbol, tf, highestCandleFromMostValid);
+      isValidPriceDistance = (highestPrice < entry.tpPrice);
+    }
+
+    if (isValidPriceDistance)
+    {
+      entry.pending = true;
+      entry.valid = true;
+    }
+  }
+
+  return entry;
 }
 
 int findMostValidSignal(string symbol, ENUM_TIMEFRAMES tf, OrderEnvironment orderEnv, SignalResult &signals[], int limitIndex = -1)
