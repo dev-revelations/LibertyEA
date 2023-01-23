@@ -396,13 +396,16 @@ OrderInfoResult getSymbolEntry(string symbol, ENUM_TIMEFRAMES currentTF, int fir
       int latestValidSignalIndex = findMostValidSignal(symbol, currentTF, maCross.orderEnvironment, signals);
       if (latestValidSignalIndex > -1)
       {
-        double high = iHigh(symbol, currentTF, 0);
-        double low = iLow(symbol, currentTF, 0);
         SignalResult latestValidSignal = signals[latestValidSignalIndex];
+        int highestShiftBetween = iHighest(symbol, currentTF, MODE_HIGH, latestValidSignal.maChangeShift, 0);
+        double high = iHigh(symbol, currentTF, highestShiftBetween);
+        int lowestShiftBetween = iLowest(symbol, currentTF, MODE_LOW, latestValidSignal.maChangeShift, 0);
+        double low = iLow(symbol, currentTF, lowestShiftBetween);
         OrderInfoResult latestValidOrder = validateOrderDistanceToCurrentCandle(symbol, currentTF, maCross.orderEnvironment, latestValidSignal);
         latestValidOrder.valid = latestValidOrder.valid && (maCross.orderEnvironment == ENV_SELL ? (price > latestValidOrder.tpPrice && high < latestValidOrder.slPrice) : (price < latestValidOrder.tpPrice && low > latestValidOrder.slPrice));
         latestValidOrder.pending = true;
         result = latestValidOrder;
+        // drawVLine(findSymbolChart(symbol), latestValidSignal.maChangeShift, "sdfdsf", C'255,210,7');
       }
     }
   }
