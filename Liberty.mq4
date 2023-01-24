@@ -14,13 +14,10 @@ extern bool EnableEATimer = true;                                        // Enab
 extern int EATimerSconds = 1;                                            // EA Timer Interval Seconds
 extern bool CheckSignalsOnNewCandle = true;                              // Check for signals on new candle openning
 extern string _separator1_2 = "======================================="; // ===== Average Candle Size Settings =====
-extern double StopLossGapInAverageCandleSize = 0.2;
 extern double AverageCandleSizeRatio = 2.25;
 extern int AverageCandleSizePeriod = 40;
 extern string _separator1 = "=======================================";   // ===== Higher Timeframe =====
 extern ENUM_TIMEFRAMES higher_timeframe = PERIOD_H4;                     // Higher Timeframe
-extern bool Enable_MA_Closing = false;                                   // Enable MA Closing Detection
-extern double MA_Closing_AverageCandleSize_Ratio = 2;                    // MA closing ratio in Average Candle Size
 extern int MA_Closing_Delay = 2;                                         // Number of higher TF candles should wait
 extern double MA_Touch_Thickness_Ratio = 0.2;                            // Higher MA Touch Thickness Ratio in Average Candle Size
 extern string _separator1_1 = "======================================="; // ===== Lower Timeframe =====
@@ -30,11 +27,12 @@ extern string _separator2 = "=======================================";   // ====
 extern int MagicNumber = 1111;
 extern double RiskPercent = 1;
 extern double TakeProfitRatio = 3;
+extern double StopLossGapInAverageCandleSize = 0.3;
 // extern double StoplossGapInPip = 2;
 extern int PendingsExpirationMinutes = 300;
 extern string CommentText = "";
 extern bool EnableBreakEven = true;                                      // Enable Break Even
-extern double BreakEvenRatio = 2.5;                                      // Break Even Ratio
+extern double BreakEvenRatio = 2.75;                                     // Break Even Ratio
 extern double BreakEvenGapPip = 2;                                       // Break Even Gap Pip
 extern string _separator4 = "=======================================";   // ===== Sessions (Min = 0 , Max = 24) =====
 extern int GMTOffset = 2;                                                // GMT Offset
@@ -160,6 +158,11 @@ void scanSymbolGroups()
       activeSymbolsListSell += "Group(" + IntegerToString(groupIdx) + ") = " + group.active_symbol_sell + "\n";
     }
 
+    if (group.active_symbol_buy != "" && group.active_symbol_sell != "")
+    {
+      continue;
+    }
+
     ////////////// Scanning Symbols In The Current Group //////////////
 
     for (int symbolIdx = 0; symbolIdx < group.symbols_count; symbolIdx++)
@@ -169,6 +172,11 @@ void scanSymbolGroups()
       simulate(symbol, lower_timeframe);
 
       if (IsTesting() && _Symbol != symbol)
+      {
+        continue;
+      }
+
+      if (group.active_symbol_buy == symbol || group.active_symbol_sell == symbol)
       {
         continue;
       }
@@ -212,7 +220,7 @@ void scanSymbolGroups()
           if (result.orderInfo.valid)
           {
             addOrderPriority(result, OP_BUY);
-            // debug("Candid added to priority list (BUY)" + symbol);
+            debug("Candid added to priority list (BUY)" + symbol);
           }
           else
           {
@@ -228,7 +236,7 @@ void scanSymbolGroups()
           if (result.orderInfo.valid)
           {
             addOrderPriority(result, OP_SELL);
-            // debug("Candid added to priority list (SELL)" + symbol);
+            debug("Candid added to priority list (SELL)" + symbol);
           }
           else
           {
@@ -237,22 +245,6 @@ void scanSymbolGroups()
         }
       }
 
-      // Agar symbole jari haman symbole montakhab bud
-      // Va agar natije in bud ke symbol mitavanad signale jadid check konad
-      // Be ebarate digar agar faghat symbole active meghdare 0 bargardanad baraye ma ahamiat darad
-      if (status == STRATEGY_STATUS_CHECKING_SIGNALS && group.active_symbol_buy == symbol)
-      {
-        group.active_symbol_buy = "";
-        StrategyResult sr;
-        group.active_strategy_buy = sr;
-      }
-
-      if (status == STRATEGY_STATUS_CHECKING_SIGNALS && group.active_symbol_sell == symbol)
-      {
-        group.active_symbol_sell = "";
-        StrategyResult sr;
-        group.active_strategy_sell = sr;
-      }
     }
 
     ////////////// Checking for prioritized candidate order //////////////
@@ -265,7 +257,7 @@ void scanSymbolGroups()
 
     openPrioritizedOrdersFor(group, OP_BUY);
     openPrioritizedOrdersFor(group, OP_SELL);
-    
+
     GROUPS[groupIdx] = group; // Hatman bayad dobare set shavad ta taghirat emal shavad
   }
 
@@ -283,8 +275,8 @@ StrategyResult runStrategy1(string symbol, ENUM_TIMEFRAMES lowTF, ENUM_TIMEFRAME
   result.status = STRATEGY_STATUS_LOCKED;
   result.symbol = symbol;
   HigherTFCrossCheckResult maCross = findHigherTimeFrameMACross(symbol, highTF);
-  HigherTFCrossCheckResult virtualMACross = findHigherTimeFrameMACross(symbol, highTF, true);
-  if (maCross.found && !virtualMACross.found)
+  // HigherTFCrossCheckResult virtualMACross = findHigherTimeFrameMACross(symbol, highTF, true);
+  if (maCross.found /*&& !virtualMACross.found*/)
   {
 
     const bool canCheckSignals = !symbolHasProfitInCurrentCrossing(symbol, groupIndex, (int)maCross.crossTime);
@@ -338,11 +330,6 @@ StrategyResult runStrategy1(string symbol, ENUM_TIMEFRAMES lowTF, ENUM_TIMEFRAME
         }
       }
     }
-  }
-  else if (virtualMACross.found)
-  {
-    // debug(symbol + " symbol being ignored, a virtual crossing has found in current higher timeframe candle");
-    // drawVLine(findSymbolChart(symbol), virtualMACross.crossCandleShift, "virtual_cross", clrAqua);
   }
 
   return result;
@@ -474,47 +461,6 @@ HigherTFCrossCheckResult findHigherTimeFrameMACross(string symbol, ENUM_TIMEFRAM
       result.orderEnvironment = ENV_BUY;
       result.found = true;
       break;
-    }
-  }
-
-  // last validation
-  if (result.found && Enable_MA_Closing)
-  {
-    double MA5_current = findVirtualCross ? getLibertyMA(symbol, 5, 0) : iMA(symbol, higherTF, 5, 0, MODE_SMA, PRICE_CLOSE, 0);
-    double MA5_prev = findVirtualCross ? getLibertyMA(symbol, 5, 1) : iMA(symbol, higherTF, 5, 0, MODE_SMA, PRICE_CLOSE, 1);
-
-    double MA10_current = findVirtualCross ? getLibertyMA(symbol, 10, 0) : iMA(symbol, higherTF, 10, 0, MODE_SMA, PRICE_CLOSE, 0);
-    double MA10_prev = findVirtualCross ? getLibertyMA(symbol, 10, 1) : iMA(symbol, higherTF, 10, 0, MODE_SMA, PRICE_CLOSE, 1);
-
-    const bool buyValidation = (MA5_current > MA10_current);
-    const bool sellValidation = (MA5_current < MA10_current);
-
-    if (MA5_current > MA10_current)
-    {
-      result.orderEnvironment = ENV_BUY;
-    }
-    else if (MA5_current < MA10_current)
-    {
-      result.orderEnvironment = ENV_SELL;
-    }
-    else
-    {
-      result.orderEnvironment = ENV_NONE;
-    }
-
-    // If more than two higher TF candle passed
-    // We will check how close the MAs are
-    // If closer than defined ratio, then it will change the environment to NONE
-    if (result.crossCandleHigherTfShift > MA_Closing_Delay)
-    {
-      const double averageCandle = averageCandleSize(symbol, PERIOD_M5, 0, AverageCandleSizePeriod);
-      const double distanceRatio = averageCandle * MA_Closing_AverageCandleSize_Ratio;
-      const double MAsDistance = MathAbs(MA10_current - MA5_current);
-
-      if (MAsDistance <= distanceRatio)
-      {
-        result.orderEnvironment = ENV_NONE;
-      }
     }
   }
 
