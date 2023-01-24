@@ -39,7 +39,7 @@ int selectLastHistoryOrderTicketFor(string symbol, int groupIndex)
             continue;
         }
 
-        if (symbol == OrderSymbol() && OrderMagicNumber() == getMagicNumber(groupIndex))
+        if (symbol == OrderSymbol() && OrderMagicNumber() == getMagicNumber(groupIndex) && !isOpPending(OrderType()))
         {
             int orderTime = (int)OrderOpenTime();
             if (orderTime > lastFoundOrderTime)
