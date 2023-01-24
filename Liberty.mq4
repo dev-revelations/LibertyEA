@@ -28,7 +28,7 @@ extern string _separator2 = "=======================================";   // ====
 extern int MagicNumber = 1111;
 extern double RiskPercent = 1;
 extern double TakeProfitRatio = 3;
-extern double StopLossGapInAverageCandleSize = 0.3;
+extern double StopLossGapInAverageCandleSize = 0.2;
 // extern double StoplossGapInPip = 2;
 extern int PendingsExpirationMinutes = 300;
 extern string CommentText = "";

@@ -55,8 +55,6 @@ int selectLastHistoryOrderTicketFor(string symbol, int groupIndex)
 
 bool symbolHasProfitInCurrentCrossing(string symbol, int groupIndex, int crossTime = -1)
 {
-    int lastHistoryOrderTicket = selectLastHistoryOrderTicketFor(symbol, groupIndex);
-
     if ((int)crossTime == -1)
     {
         HigherTFCrossCheckResult maCross = findHigherTimeFrameMACross(symbol, higher_timeframe);
@@ -68,8 +66,17 @@ bool symbolHasProfitInCurrentCrossing(string symbol, int groupIndex, int crossTi
 
     if ((int)crossTime > -1)
     {
-        if (lastHistoryOrderTicket > -1 && OrderSelect(lastHistoryOrderTicket, SELECT_BY_TICKET, MODE_HISTORY) == true)
+
+        int i, hstTotal = OrdersHistoryTotal();
+
+        for (i = 0; i < hstTotal; i++)
         {
+            //---- check selection result
+            if (OrderSelect(i, SELECT_BY_POS, MODE_HISTORY) == false)
+            {
+                continue;
+            }
+
             if (symbol == OrderSymbol() && OrderMagicNumber() == getMagicNumber(groupIndex) && !isOpPending(OrderType()))
             {
                 bool hadProfit = OrderProfit() >= 0; // OrderClosePrice() >= OrderTakeProfit();
@@ -86,7 +93,10 @@ bool symbolHasProfitInCurrentCrossing(string symbol, int groupIndex, int crossTi
 
                     bool orderHappenedAfterCrossing = orderTime > cross_Time;
 
-                    return orderHappenedAfterCrossing && sessionsEqual(orderSession, currentSession);
+                    if (orderHappenedAfterCrossing && sessionsEqual(orderSession, currentSession))
+                    {
+                        return true;
+                    }
                 }
             }
         }
