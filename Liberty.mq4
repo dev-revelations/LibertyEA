@@ -20,6 +20,7 @@ extern string _separator1 = "=======================================";   // ====
 extern ENUM_TIMEFRAMES higher_timeframe = PERIOD_H4;                     // Higher Timeframe
 extern int MA_Closing_Delay = 2;                                         // Number of higher TF candles should wait
 extern double MA_Touch_Thickness_Ratio = 0.2;                            // Higher MA Touch Thickness Ratio in Average Candle Size
+extern double MA_Crossing_Opening_Ratio = 0.5;                           // MA Cross Openning Size Ratio in Average Candle Size
 extern string _separator1_1 = "======================================="; // ===== Lower Timeframe =====
 extern ENUM_TIMEFRAMES lower_timeframe = PERIOD_M5;                      // Lower Timeframe (Never select current)
 extern bool OnlyMaCandleBreaks = true;                                   // Shohld candle break MA?
@@ -38,12 +39,12 @@ extern string _separator4 = "=======================================";   // ====
 extern int GMTOffset = 2;                                                // GMT Offset
 extern bool EnableTradingSession1 = true;                                // Enable Trading in Session 1
 extern int SessionStart1 = 0;                                            // Session Start 1
-extern int SessionEnd1 = 17;                                             // Session End 1
+extern int SessionEnd1 = 21;                                             // Session End 1
 extern bool EnableTradingSession2 = false;                               // Enable Trading in Session 2
-extern int SessionStart2 = 18;                                           // Session Start 2
+extern int SessionStart2 = 22;                                           // Session Start 2
 extern int SessionEnd2 = 23;                                             // Session End 2
 extern bool EnableTradingSession3 = false;                               // Enable Trading in Session 3
-extern int SessionStart3 = 18;                                           // Session Start 3
+extern int SessionStart3 = 22;                                           // Session Start 3
 extern int SessionEnd3 = 23;                                             // Session End 3
 extern string _separator4_1 = "======================================="; // ===== Custom Groups =====
 extern string CustomGroup1 = "TecDE30 F40 UK100 US30 US2000 US500";
@@ -244,7 +245,6 @@ void scanSymbolGroups()
           }
         }
       }
-
     }
 
     ////////////// Checking for prioritized candidate order //////////////
@@ -452,7 +452,6 @@ HigherTFCrossCheckResult findHigherTimeFrameMACross(string symbol, ENUM_TIMEFRAM
 
       result.orderEnvironment = ENV_SELL;
       result.found = true;
-      break;
     }
     else if (MA5_prev < MA10_prev && MA5_current > MA10_current)
     {
@@ -460,6 +459,59 @@ HigherTFCrossCheckResult findHigherTimeFrameMACross(string symbol, ENUM_TIMEFRAM
       // Alert(MA5_current);
       result.orderEnvironment = ENV_BUY;
       result.found = true;
+    }
+
+    /**
+     * Checking for visual crossing openning size based on the a ratio of the average candle size
+     * Steps:
+     * 1- Size dahaneye crossing agar ghabele ghabul bud moshakhasate crossing tayin mishavad
+     * 2- Agar size dahaneye crossing ghabele ghabul nabud:
+     *    1- Agar crossing dar 4 saate akhir etefagh oftade, result.found=false mishavad va sabr mikonim ta vaziat taghir konad
+     *    2- Agar crossing dar 4 saate jari nabud, size dahaneye 4 saate badaz an ra check mikonim, agar ghabele ghabul bud an noghte ra be onvane crossing dar nazar migirim
+     * */
+
+    if (result.found)
+    {
+      if (!findVirtualCross)
+      {
+        double openningSizeRatio = averageCandleSize(symbol, lower_timeframe, i, AverageCandleSizePeriod) * MA_Crossing_Opening_Ratio;
+        double openningSize = MathAbs(MA5_current - MA10_current);
+        if (openningSize < openningSizeRatio)
+        {
+          if (actualShift == 0 || actualShift == 1)
+          {
+            result.orderEnvironment = ENV_NONE;
+            result.found = false;
+            // debug("Very Small Crossing Openning: " + symbol);
+          }
+          else if (actualShift > 1)
+          {
+            
+            // Scan until current time to find the proper cross openning anfle size
+            int crossShiftCurrentPeriod = i + 1;
+            for (int shiftIdx = actualShift - 1; shiftIdx > 1; shiftIdx--)
+            {
+              MA5_current = getMA(symbol, higherTF, 5, shiftIdx);
+              MA10_current = getMA(symbol, higherTF, 10, shiftIdx);
+              openningSize = MathAbs(MA5_current - MA10_current);
+              if (openningSize >= openningSizeRatio)
+              {
+                price = iOpen(symbol, lower_timeframe, crossShiftCurrentPeriod);
+                currentShiftTime = iTime(symbol, lower_timeframe, crossShiftCurrentPeriod);
+                result.crossOpenPrice = price;
+                result.crossCandleHigherTfShift = shiftIdx;
+                result.crossCandleShift = crossShiftCurrentPeriod;
+                result.crossTime = currentShiftTime;
+                result.found = true;
+                break;
+              }
+              crossShiftCurrentPeriod = (crossShiftCurrentPeriod - (int)(higherTF / lower_timeframe)) + 1;
+              crossShiftCurrentPeriod = crossShiftCurrentPeriod >= 0 ? crossShiftCurrentPeriod : 0;
+            }
+          }
+        }
+      }
+
       break;
     }
   }
