@@ -142,8 +142,8 @@ void openPrioritizedOrdersFor(GroupStruct &group, int OP)
         {
             StrategyResult sr = prioritizedList[i];
 
-            // If Not have an already open order
-            bool canOpen = (selectOpenOrderTicketFor(sr.symbol, group.groupIndex) <= 0);
+            // If Not have an already active transaction or open pending
+            bool canOpen = !hasActiveTransaction(sr.symbol, group.groupIndex) && (selectOpenOrderTicketFor(sr.symbol, group.groupIndex) <= 0);
 
             if (canOpen)
             {
