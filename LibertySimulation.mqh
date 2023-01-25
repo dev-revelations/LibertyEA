@@ -182,6 +182,17 @@ void simulate(string symbol, ENUM_TIMEFRAMES low_tf)
 
                             orderCalculated = validateOrderDistance(symbol, low_tf, maCross.orderEnvironment, signals, i);
 
+                            // Try to find an invalid order before last signal
+                            for (int sIdx = 0; sIdx < i; sIdx++)
+                            {
+                                OrderInfoResult validatedOrder = validateOrderDistance(symbol, low_tf, maCross.orderEnvironment, signals, sIdx);
+                                if (validatedOrder.valid == false)
+                                {
+                                    orderCalculated.valid = false;
+                                    break;
+                                }
+                            }
+
                             drawValidationObj(chartId, item.maChangeShift, maCross.orderEnvironment == ENV_BUY, orderCalculated.valid, IntegerToString(item.maChangeShift), orderCalculated.valid ? C'9,255,9' : C'249,92,92');
 
                             if (i == active && ShowTP_SL)

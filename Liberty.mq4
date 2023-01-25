@@ -39,7 +39,7 @@ extern string _separator4 = "=======================================";   // ====
 extern int GMTOffset = 2;                                                // GMT Offset
 extern bool EnableTradingSession1 = true;                                // Enable Trading in Session 1
 extern int SessionStart1 = 0;                                            // Session Start 1
-extern int SessionEnd1 = 21;                                             // Session End 1
+extern int SessionEnd1 = 17;                                             // Session End 1
 extern bool EnableTradingSession2 = false;                               // Enable Trading in Session 2
 extern int SessionStart2 = 22;                                           // Session Start 2
 extern int SessionEnd2 = 23;                                             // Session End 2
@@ -127,6 +127,7 @@ void runEA()
 
   if (SingleChart)
   {
+    simulate(_Symbol, lower_timeframe);
     runStrategy1(_Symbol, lower_timeframe, higher_timeframe, 0);
   }
   else
@@ -356,6 +357,18 @@ OrderInfoResult getSymbolEntry(string symbol, ENUM_TIMEFRAMES currentTF, int fir
     // Validate Signal
     OrderInfoResult orderCalculated = signalToOrderInfo(symbol, currentTF, maCross.orderEnvironment, lastSignal);
     orderCalculated = validateOrderDistance(symbol, currentTF, maCross.orderEnvironment, signals, lastSignalIndex);
+
+    // Try to find an invalid order before last signal
+    for (int sIdx = 0; sIdx < lastSignalIndex; sIdx++)
+    {
+      OrderInfoResult validatedOrder = validateOrderDistance(symbol, currentTF, maCross.orderEnvironment, signals, sIdx);
+      if (validatedOrder.valid == false)
+      {
+        orderCalculated.valid = false;
+        break;
+      }
+    }
+
     // If last signal is hapenning now
     if (lastSignal.maChangeShift >= 0 && lastSignal.maChangeShift <= 2 && orderCalculated.valid)
     {
@@ -486,7 +499,7 @@ HigherTFCrossCheckResult findHigherTimeFrameMACross(string symbol, ENUM_TIMEFRAM
           }
           else if (actualShift > 1)
           {
-            
+
             // Scan until current time to find the proper cross openning anfle size
             int crossShiftCurrentPeriod = i + 1;
             for (int shiftIdx = actualShift - 1; shiftIdx > 1; shiftIdx--)
