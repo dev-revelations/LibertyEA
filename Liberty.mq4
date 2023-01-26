@@ -47,7 +47,7 @@ extern bool EnableTradingSession3 = false;                               // Enab
 extern int SessionStart3 = 22;                                           // Session Start 3
 extern int SessionEnd3 = 23;                                             // Session End 3
 extern string _separator4_1 = "======================================="; // ===== Custom Groups =====
-extern string CustomGroup1 = "TecDE30 F40 UK100 US30 US2000 US500";
+extern string CustomGroup1 = "TecDE30 F40 UK100 US30 US2000 US500 USTEC";
 extern string CustomGroup2 = "XBRUSD";
 extern string _separator5 = "======================================="; // ===== Test & Simulation =====
 extern bool EnableSimulation = false;
