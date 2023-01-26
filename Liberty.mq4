@@ -356,17 +356,22 @@ OrderInfoResult getSymbolEntry(string symbol, ENUM_TIMEFRAMES currentTF, int fir
     SignalResult lastSignal = signals[lastSignalIndex];
     // Validate Signal
     OrderInfoResult orderCalculated = signalToOrderInfo(symbol, currentTF, maCross.orderEnvironment, lastSignal);
-    orderCalculated = validateOrderDistance(symbol, currentTF, maCross.orderEnvironment, signals, lastSignalIndex);
-
     // Try to find an invalid order before last signal
+    bool foundInvalid = false;
     for (int sIdx = 0; sIdx < lastSignalIndex; sIdx++)
     {
       OrderInfoResult validatedOrder = validateOrderDistance(symbol, currentTF, maCross.orderEnvironment, signals, sIdx);
       if (validatedOrder.valid == false)
       {
         orderCalculated.valid = false;
+        foundInvalid = true;
         break;
       }
+    }
+
+    if (foundInvalid == false)
+    {
+      orderCalculated = validateOrderDistance(symbol, currentTF, maCross.orderEnvironment, signals, lastSignalIndex);
     }
 
     // If last signal is hapenning now
@@ -390,7 +395,7 @@ OrderInfoResult getSymbolEntry(string symbol, ENUM_TIMEFRAMES currentTF, int fir
 
       result = orderCalculated;
     }
-    else if (lastSignal.maChangeShift > 2)
+    else if (lastSignal.maChangeShift > 2 && foundInvalid == false)
     {
       // if last signal is not hapenning now, find the latest valid signal and set a pending order for it
       int latestValidSignalIndex = findMostValidSignal(symbol, currentTF, maCross.orderEnvironment, signals);
@@ -919,7 +924,7 @@ OrderInfoResult validateOrderDistance(string symbol, ENUM_TIMEFRAMES tf, OrderEn
     SignalResult mostValidEntrySignal = signals[place];
     OrderInfoResult mostValidEntry = signalToOrderInfo(symbol, tf, orderEnv, mostValidEntrySignal);
 
-    if (mostValidEntry.orderPrice > -1)
+    if (mostValidEntry.orderPrice > -1 && signalIndexToValidate != place)
     {
       bool isValidPriceDistance = true;
       int candlesCountFromMostValidEntry = MathAbs(mostValidEntrySignal.maChangeShift - signal.maChangeShift);
@@ -963,6 +968,12 @@ OrderInfoResult validateOrderDistance(string symbol, ENUM_TIMEFRAMES tf, OrderEn
     else
     {
       // If nothing found the order itself is valid whatever calculated
+      indexOrderInfo.valid = true;
+    }
+
+    if (signalIndexToValidate == place)
+    {
+      indexOrderInfo.pending = false;
       indexOrderInfo.valid = true;
     }
   }
@@ -1016,12 +1027,12 @@ int findMostValidSignal(string symbol, ENUM_TIMEFRAMES tf, OrderEnvironment orde
   // Find highest/lowest entry price in the past
   if (limitIndex <= -1)
   {
-    limitIndex = ArraySize(signals);
+    limitIndex = ArraySize(signals) - 1;
   }
   SignalResult mostValidEntrySignal = signals[0];
   OrderInfoResult mostValidEntry = signalToOrderInfo(symbol, tf, orderEnv, mostValidEntrySignal);
   int place = 0;
-  for (int i = 0; i < limitIndex; i++)
+  for (int i = 0; i <= limitIndex; i++)
   {
     SignalResult item = signals[i];
     OrderInfoResult signalOrderInfo = signalToOrderInfo(symbol, tf, orderEnv, item);
