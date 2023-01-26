@@ -732,7 +732,7 @@ LowMaChangeResult getLowerMaDirection(string symbol, ENUM_TIMEFRAMES lower_tf, i
       }
       else
       {
-        result.lastChangeShift = j - 2;
+        result.lastChangeShift = j;
         break;
       }
     }
@@ -761,7 +761,7 @@ LowMaChangeResult getLowerMaDirection(string symbol, ENUM_TIMEFRAMES lower_tf, i
       }
       else
       {
-        result.lastChangeShift = j - 1;
+        result.lastChangeShift = j;
         break;
       }
     }
@@ -1007,7 +1007,7 @@ OrderInfoResult validateOrderDistance(string symbol, ENUM_TIMEFRAMES tf, OrderEn
         signal.lowestShift = lowestFromFirstTouch;
       }
 
-      indexOrderInfo = signalToOrderInfo(symbol, tf, orderEnv, signal);
+      indexOrderInfo = signalToOrderInfo(symbol, tf, orderEnv, signal, false);
       // indexOrderInfo.pending = false;
       indexOrderInfo.valid = true;
 
