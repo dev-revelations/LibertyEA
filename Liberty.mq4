@@ -160,11 +160,6 @@ void scanSymbolGroups()
       activeSymbolsListSell += "Group(" + IntegerToString(groupIdx) + ") = " + group.active_symbol_sell + "\n";
     }
 
-    if (group.active_symbol_buy != "" && group.active_symbol_sell != "")
-    {
-      continue;
-    }
-
     ////////////// Scanning Symbols In The Current Group //////////////
 
     for (int symbolIdx = 0; symbolIdx < group.symbols_count; symbolIdx++)
@@ -174,6 +169,11 @@ void scanSymbolGroups()
       simulate(symbol, lower_timeframe);
 
       if (IsTesting() && _Symbol != symbol)
+      {
+        continue;
+      }
+
+      if (group.active_symbol_buy != "" && group.active_symbol_sell != "")
       {
         continue;
       }
