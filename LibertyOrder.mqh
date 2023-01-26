@@ -59,7 +59,6 @@ int Order(string symbol, OrderEnvironment orderEnv, OrderInfoResult &orderInfo, 
         OP = OP_SELL;
         double marketPrice = MarketInfo(symbol, MODE_BID);
 
-        orderInfo.pending = marketPrice != price;
         if (orderInfo.pending)
         {
             OP = marketPrice < price ? OP_SELLLIMIT : OP_SELLSTOP;
