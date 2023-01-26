@@ -53,7 +53,8 @@ extern string _separator5 = "======================================="; // ===== 
 extern bool EnableSimulation = false;
 extern bool ClearObjects = false; // Clear Objects If Simulation Is Off
 extern int ActiveSignalForTest = 0;
-extern bool ShowTP_SL = false; // Show TP & SL Lines
+extern bool ShowTP_SL = false;                // Show TP & SL Lines
+extern bool ShowLinesForOpenedOrders = false; // Show lines for opened orders
 
 //////////////////////////////////////////////////////////////////////////////
 #include <WinUser32.mqh>
@@ -127,7 +128,7 @@ void runEA()
 
   if (SingleChart)
   {
-    simulate(_Symbol, lower_timeframe);
+    simulate(_Symbol, lower_timeframe, 0);
     runStrategy1(_Symbol, lower_timeframe, higher_timeframe, 0);
   }
   else
@@ -166,7 +167,7 @@ void scanSymbolGroups()
     {
       string symbol = group.symbols[symbolIdx];
 
-      simulate(symbol, lower_timeframe);
+      simulate(symbol, lower_timeframe, groupIdx);
 
       if (IsTesting() && _Symbol != symbol)
       {
