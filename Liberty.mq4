@@ -453,7 +453,9 @@ HigherTFCrossCheckResult findHigherTimeFrameMACross(string symbol, ENUM_TIMEFRAM
     double MA10_prev = findVirtualCross ? getLibertyMA(symbol, 10, i + 1) : getMA(symbol, higherTF, 10, actualShift + 1);
 
     // Only Current TimeFrame data
-    int higherTFBeginningInCurrentPeriod = findVirtualCross ? i : i + (int)(higherTF / lower_timeframe) - 1;
+    datetime higherTFCandleTime = iTime(symbol, higherTF, actualShift);
+    int higherTFinLowerCandleShift = iBarShift(symbol, lower_timeframe, higherTFCandleTime, false);
+    int higherTFBeginningInCurrentPeriod = findVirtualCross ? i : higherTFinLowerCandleShift; // i + (int)(higherTF / lower_timeframe) - 1;
     datetime currentShiftTime = iTime(symbol, lower_timeframe, higherTFBeginningInCurrentPeriod);
     double price = iOpen(symbol, lower_timeframe, higherTFBeginningInCurrentPeriod);
 
@@ -506,9 +508,10 @@ HigherTFCrossCheckResult findHigherTimeFrameMACross(string symbol, ENUM_TIMEFRAM
           {
 
             // Scan until current time to find the proper cross openning anfle size
-            int crossShiftCurrentPeriod = i + 1;
             for (int shiftIdx = actualShift - 1; shiftIdx > 1; shiftIdx--)
             {
+              datetime higherTFCandleTime = iTime(symbol, higherTF, shiftIdx);
+              int crossShiftCurrentPeriod = iBarShift(symbol, lower_timeframe, higherTFCandleTime, false);
               MA5_current = getMA(symbol, higherTF, 5, shiftIdx);
               MA10_current = getMA(symbol, higherTF, 10, shiftIdx);
               openningSize = MathAbs(MA5_current - MA10_current);
@@ -523,8 +526,8 @@ HigherTFCrossCheckResult findHigherTimeFrameMACross(string symbol, ENUM_TIMEFRAM
                 result.found = true;
                 break;
               }
-              crossShiftCurrentPeriod = (crossShiftCurrentPeriod - (int)(higherTF / lower_timeframe)) + 1;
-              crossShiftCurrentPeriod = crossShiftCurrentPeriod >= 0 ? crossShiftCurrentPeriod : 0;
+              // crossShiftCurrentPeriod = (crossShiftCurrentPeriod - (int)(higherTF / lower_timeframe)) + 1;
+              // crossShiftCurrentPeriod = crossShiftCurrentPeriod >= 0 ? crossShiftCurrentPeriod : 0;
             }
           }
         }
