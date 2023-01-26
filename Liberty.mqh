@@ -68,6 +68,7 @@ struct HigherTFCrossCheckResult
 struct OrderInfoResult
 {
     double slPrice;
+    double absoluteSlPrice;
     double tpPrice;
     double orderPrice;        // Final decision
     double pendingOrderPrice; // Calculated pending price
@@ -78,6 +79,7 @@ struct OrderInfoResult
     OrderInfoResult()
     {
         slPrice = -1;
+        absoluteSlPrice = -1;
         tpPrice = -1;
         orderPrice = -1;
         pendingOrderPrice = -1;

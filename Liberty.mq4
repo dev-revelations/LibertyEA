@@ -871,6 +871,7 @@ OrderInfoResult calculeOrderPlace(string symbol, ENUM_TIMEFRAMES tf, OrderEnviro
 
   if (orderEnv == ENV_SELL)
   {
+    orderInfo.absoluteSlPrice = highestLowestPrice;
     orderInfo.slPrice = highestLowestPrice + gapSizeInPoint;
 
     double stopLossToScaledCandleSize = orderInfo.slPrice - scaledCandleSize;
@@ -883,6 +884,7 @@ OrderInfoResult calculeOrderPlace(string symbol, ENUM_TIMEFRAMES tf, OrderEnviro
   }
   else if (orderEnv == ENV_BUY)
   {
+    orderInfo.absoluteSlPrice = highestLowestPrice;
     orderInfo.slPrice = highestLowestPrice - gapSizeInPoint;
 
     double stopLossToScaledCandleSize = orderInfo.slPrice + scaledCandleSize;
@@ -1040,13 +1042,13 @@ int findMostValidSignal(string symbol, ENUM_TIMEFRAMES tf, OrderEnvironment orde
     SignalResult item = signals[i];
     OrderInfoResult signalOrderInfo = signalToOrderInfo(symbol, tf, orderEnv, item);
 
-    if (orderEnv == ENV_SELL && signalOrderInfo.originalPrice > mostValidEntry.originalPrice)
+    if (orderEnv == ENV_SELL && signalOrderInfo.originalPrice > mostValidEntry.absoluteSlPrice)
     {
       mostValidEntrySignal = item;
       mostValidEntry = signalOrderInfo;
       place = i;
     }
-    else if (orderEnv == ENV_BUY && signalOrderInfo.originalPrice < mostValidEntry.originalPrice)
+    else if (orderEnv == ENV_BUY && signalOrderInfo.originalPrice < mostValidEntry.absoluteSlPrice)
     {
       mostValidEntrySignal = item;
       mostValidEntry = signalOrderInfo;
