@@ -33,7 +33,7 @@ int Order(string symbol, OrderEnvironment orderEnv, OrderInfoResult &orderInfo, 
 
     int OP = 0;
 
-    const int digits = (int)MarketInfo(symbol, MODE_DIGITS);
+    const int digits = (int)SymbolInfoInteger(symbol, SYMBOL_DIGITS);
 
     double price = NormalizeDouble(orderInfo.orderPrice, digits);
 
@@ -41,7 +41,8 @@ int Order(string symbol, OrderEnvironment orderEnv, OrderInfoResult &orderInfo, 
     {
         // By default it set to buy
         OP = OP_BUY;
-        double marketPrice = MarketInfo(symbol, MODE_ASK);
+        RefreshRates();
+        double marketPrice = SymbolInfoDouble(symbol, SYMBOL_ASK);
 
         if (orderInfo.pending)
         {
@@ -57,7 +58,8 @@ int Order(string symbol, OrderEnvironment orderEnv, OrderInfoResult &orderInfo, 
     {
         // By default it set to sell
         OP = OP_SELL;
-        double marketPrice = MarketInfo(symbol, MODE_BID);
+        RefreshRates();
+        double marketPrice = SymbolInfoDouble(symbol, SYMBOL_BID);
 
         if (orderInfo.pending)
         {
@@ -88,7 +90,7 @@ int Order(string symbol, OrderEnvironment orderEnv, OrderInfoResult &orderInfo, 
     if (OP == OP_BUY || OP == OP_SELL)
         debug(symbol + " Opening Immediate " + (OP == OP_BUY ? "Buy" : "Sell"));
 
-    return OrderSend(
+    int result = OrderSend(
         symbol,
         OP,
         LotSize,
@@ -100,6 +102,13 @@ int Order(string symbol, OrderEnvironment orderEnv, OrderInfoResult &orderInfo, 
         magicNumber,
         expiration,
         Green);
+
+    if (result <= -1)
+    {
+        debug(symbol + " Failed to open order, Error = " + IntegerToString(GetLastError()) + " , Spread = " + DoubleToString(MarketInfo(symbol, MODE_SPREAD)));
+    }
+
+    return result;
 }
 
 bool isOpPending(int op)

@@ -1007,7 +1007,7 @@ OrderInfoResult validateOrderDistance(string symbol, ENUM_TIMEFRAMES tf, OrderEn
         signal.lowestShift = lowestFromFirstTouch;
       }
 
-      indexOrderInfo = signalToOrderInfo(symbol, tf, orderEnv, signal, false);
+      indexOrderInfo = signalToOrderInfo(symbol, tf, orderEnv, signal);
       // indexOrderInfo.pending = false;
       indexOrderInfo.valid = true;
 
