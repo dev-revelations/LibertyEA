@@ -360,7 +360,7 @@ OrderInfoResult getSymbolEntry(string symbol, ENUM_TIMEFRAMES currentTF, int fir
     bool foundInvalid = false;
     for (int sIdx = 0; sIdx < lastSignalIndex; sIdx++)
     {
-      OrderInfoResult validatedOrder = validateOrderDistance(symbol, currentTF, maCross.orderEnvironment, signals, sIdx);
+      OrderInfoResult validatedOrder = validateOrderDistance(symbol, currentTF, maCross.orderEnvironment, firstAreaTouchShift, signals, sIdx);
       if (validatedOrder.valid == false)
       {
         orderCalculated.valid = false;
@@ -371,7 +371,7 @@ OrderInfoResult getSymbolEntry(string symbol, ENUM_TIMEFRAMES currentTF, int fir
 
     if (foundInvalid == false)
     {
-      orderCalculated = validateOrderDistance(symbol, currentTF, maCross.orderEnvironment, signals, lastSignalIndex);
+      orderCalculated = validateOrderDistance(symbol, currentTF, maCross.orderEnvironment, firstAreaTouchShift, signals, lastSignalIndex);
     }
 
     // If last signal is hapenning now
@@ -915,7 +915,7 @@ OrderInfoResult signalToOrderInfo(string symbol, ENUM_TIMEFRAMES tf, OrderEnviro
   return orderCalculated;
 }
 
-OrderInfoResult validateOrderDistance(string symbol, ENUM_TIMEFRAMES tf, OrderEnvironment orderEnv, SignalResult &signals[], int signalIndexToValidate)
+OrderInfoResult validateOrderDistance(string symbol, ENUM_TIMEFRAMES tf, OrderEnvironment orderEnv, int firstAreaTouchShift, SignalResult &signals[], int signalIndexToValidate)
 {
 
   SignalResult signal = signals[signalIndexToValidate];
@@ -978,8 +978,22 @@ OrderInfoResult validateOrderDistance(string symbol, ENUM_TIMEFRAMES tf, OrderEn
 
     if (signalIndexToValidate == place)
     {
-      indexOrderInfo.pending = false;
+      if (orderEnv == ENV_SELL)
+      {
+        int highestFromFirstTouch = iHighest(symbol, tf, MODE_HIGH, MathAbs(signal.maChangeShift - firstAreaTouchShift), signal.maChangeShift);
+        signal.highestShift = highestFromFirstTouch;
+      }
+      else if (orderEnv == ENV_BUY)
+      {
+        int lowestFromFirstTouch = iLowest(symbol, tf, MODE_LOW, MathAbs(signal.maChangeShift - firstAreaTouchShift), signal.maChangeShift);
+        signal.lowestShift = lowestFromFirstTouch;
+      }
+
+      indexOrderInfo = signalToOrderInfo(symbol, tf, orderEnv, signal);
+      // indexOrderInfo.pending = false;
       indexOrderInfo.valid = true;
+
+      signals[signalIndexToValidate] = signal;
     }
   }
   else
@@ -1042,13 +1056,13 @@ int findMostValidSignal(string symbol, ENUM_TIMEFRAMES tf, OrderEnvironment orde
     SignalResult item = signals[i];
     OrderInfoResult signalOrderInfo = signalToOrderInfo(symbol, tf, orderEnv, item);
 
-    if (orderEnv == ENV_SELL && signalOrderInfo.originalPrice > mostValidEntry.absoluteSlPrice)
+    if (orderEnv == ENV_SELL && signalOrderInfo.slPrice > mostValidEntry.absoluteSlPrice)
     {
       mostValidEntrySignal = item;
       mostValidEntry = signalOrderInfo;
       place = i;
     }
-    else if (orderEnv == ENV_BUY && signalOrderInfo.originalPrice < mostValidEntry.absoluteSlPrice)
+    else if (orderEnv == ENV_BUY && signalOrderInfo.slPrice < mostValidEntry.absoluteSlPrice)
     {
       mostValidEntrySignal = item;
       mostValidEntry = signalOrderInfo;
