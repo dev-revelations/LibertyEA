@@ -84,7 +84,7 @@ void prioritizeOrders(StrategyResult &list[], int count, StrategyResult &priorit
         StrategyResult item = list[i];
         if (item.orderInfo.valid)
         {
-            Print(item.symbol, " From Prioritization List");
+            debug(item.symbol + " From Prioritization List");
 
             // One is immediate
             if (result.orderInfo.pending && !item.orderInfo.pending)
