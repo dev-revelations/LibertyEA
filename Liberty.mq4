@@ -922,7 +922,7 @@ OrderInfoResult validateOrderDistance(string symbol, ENUM_TIMEFRAMES tf, OrderEn
 
   OrderInfoResult indexOrderInfo = signalToOrderInfo(symbol, tf, orderEnv, signal);
 
-  if (signalIndexToValidate > 0)
+  if (signalIndexToValidate >= 0)
   {
     // Find highest/lowest entry price in the past
     int place = findMostValidSignal(symbol, tf, orderEnv, signals, signalIndexToValidate);
@@ -961,11 +961,28 @@ OrderInfoResult validateOrderDistance(string symbol, ENUM_TIMEFRAMES tf, OrderEn
       if (isValidPriceDistance)
       {
         // If the highest/lowest found previous signal has higher/lower slPrice will replace it with current signal order info
+        SignalResult signalToProcess = signal;
         bool shohldReplaceOrderInfo = (orderEnv == ENV_SELL && mostValidEntry.slPrice > indexOrderInfo.slPrice) || (orderEnv == ENV_BUY && mostValidEntry.slPrice < indexOrderInfo.slPrice);
         if (shohldReplaceOrderInfo)
         {
           indexOrderInfo = mostValidEntry;
+          signalToProcess = mostValidEntrySignal;
         }
+
+        // Correcting Stoploss place
+        if (orderEnv == ENV_SELL)
+        {
+          int highestFromFirstTouch = iHighest(symbol, tf, MODE_HIGH, MathAbs(signalToProcess.maChangeShift - firstAreaTouchShift), signalToProcess.maChangeShift);
+          signalToProcess.highestShift = highestFromFirstTouch;
+        }
+        else if (orderEnv == ENV_BUY)
+        {
+          int lowestFromFirstTouch = iLowest(symbol, tf, MODE_LOW, MathAbs(signalToProcess.maChangeShift - firstAreaTouchShift), signalToProcess.maChangeShift);
+          signalToProcess.lowestShift = lowestFromFirstTouch;
+        }
+
+        indexOrderInfo = signalToOrderInfo(symbol, tf, orderEnv, signalToProcess);
+
         indexOrderInfo.pending = true;
         indexOrderInfo.valid = true;
       }
@@ -978,6 +995,7 @@ OrderInfoResult validateOrderDistance(string symbol, ENUM_TIMEFRAMES tf, OrderEn
 
     if (signalIndexToValidate == place)
     {
+      // Correcting Stoploss place
       if (orderEnv == ENV_SELL)
       {
         int highestFromFirstTouch = iHighest(symbol, tf, MODE_HIGH, MathAbs(signal.maChangeShift - firstAreaTouchShift), signal.maChangeShift);
