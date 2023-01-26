@@ -510,7 +510,7 @@ HigherTFCrossCheckResult findHigherTimeFrameMACross(string symbol, ENUM_TIMEFRAM
             // Scan until current time to find the proper cross openning anfle size
             for (int shiftIdx = actualShift - 1; shiftIdx > 1; shiftIdx--)
             {
-              datetime higherTFCandleTime = iTime(symbol, higherTF, shiftIdx);
+              higherTFCandleTime = iTime(symbol, higherTF, shiftIdx);
               int crossShiftCurrentPeriod = iBarShift(symbol, lower_timeframe, higherTFCandleTime, false);
               MA5_current = getMA(symbol, higherTF, 5, shiftIdx);
               MA10_current = getMA(symbol, higherTF, 10, shiftIdx);
