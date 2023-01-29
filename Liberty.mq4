@@ -949,18 +949,21 @@ OrderInfoResult validateOrderDistance(string symbol, ENUM_TIMEFRAMES tf, OrderEn
     {
       bool isValidPriceDistance = true;
       int candlesCountFromMostValidEntry = MathAbs(mostValidEntrySignal.maChangeShift - signal.maChangeShift);
+      const double mostValidBreakevenSize = MathAbs(mostValidEntry.orderPrice - mostValidEntry.slPrice) * BreakEvenRatio;
 
       if (orderEnv == ENV_SELL)
       {
         int lowestCandleFromMostValid = iLowest(symbol, tf, MODE_LOW, candlesCountFromMostValidEntry, signal.maChangeShift);
         double lowestPrice = iLow(symbol, tf, lowestCandleFromMostValid);
-        isValidPriceDistance = (indexOrderInfo.originalPrice > mostValidEntry.tpPrice) && (lowestPrice > mostValidEntry.tpPrice);
+        double mostValidEntryBreakevenPrice = mostValidEntry.orderPrice - mostValidBreakevenSize;
+        isValidPriceDistance = (indexOrderInfo.originalPrice > mostValidEntryBreakevenPrice /*mostValidEntry.tpPrice*/) && (lowestPrice > mostValidEntryBreakevenPrice /*mostValidEntry.tpPrice*/);
       }
       else if (orderEnv == ENV_BUY)
       {
         int highestCandleFromMostValid = iHighest(symbol, tf, MODE_HIGH, candlesCountFromMostValidEntry, signal.maChangeShift);
         double highestPrice = iHigh(symbol, tf, highestCandleFromMostValid);
-        isValidPriceDistance = (indexOrderInfo.originalPrice < mostValidEntry.tpPrice) && (highestPrice < mostValidEntry.tpPrice);
+        double mostValidEntryBreakevenPrice = mostValidEntry.orderPrice + mostValidBreakevenSize;
+        isValidPriceDistance = (indexOrderInfo.originalPrice < mostValidEntryBreakevenPrice /*mostValidEntry.tpPrice*/) && (highestPrice < mostValidEntryBreakevenPrice /*mostValidEntry.tpPrice*/);
       }
 
       // if (signalIndexToValidate == ActiveSignalForTest)
