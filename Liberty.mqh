@@ -68,6 +68,7 @@ struct HigherTFCrossCheckResult
 struct OrderInfoResult
 {
     double slPrice;
+    double absoluteSlPrice;
     double tpPrice;
     double orderPrice;        // Final decision
     double pendingOrderPrice; // Calculated pending price
@@ -78,6 +79,7 @@ struct OrderInfoResult
     OrderInfoResult()
     {
         slPrice = -1;
+        absoluteSlPrice = -1;
         tpPrice = -1;
         orderPrice = -1;
         pendingOrderPrice = -1;
@@ -92,7 +94,6 @@ struct StrategyResult
 {
     StrategyStatus status;
     OrderInfoResult orderInfo;
-    SignalResult signal;
     string symbol;
     HigherTFCrossCheckResult maCross;
 
@@ -119,128 +120,49 @@ struct GroupStruct
     StrategyResult active_strategy_sell;
     MA_Array MA5[];
     MA_Array MA10[];
+    int groupIndex;
 
     GroupStruct()
     {
         active_symbol_buy = "";
         active_symbol_sell = "";
         symbols_count = 0;
+        groupIndex = -1;
     }
 };
 
 ////////////////////////////////// Variables & Constants ///////////////////////////////
+int minuteTimer = 0;
 
-const int PRIORITY_LIST_MAX = 10;
-StrategyResult BUY_PRIORITY_CHECK_LIST[10];
-StrategyResult SELL_PRIORITY_CHECK_LIST[10];
-int priority_index_buy = 0;
-int priority_index_sell = 0;
+/////////////////////////////////// Symbol Groups Data Structures///////////////////////////////////////////
+
+string GROUPS_STR[] = {
+    "EURUSD GBPUSD AUDUSD NZDUSD",
+    "USDCHF GBPCHF CADCHF EURCHF NZDCHF AUDCHF",
+    "USDJPY EURJPY GBPJPY NZDJPY AUDJPY CHFJPY CADJPY",
+    "USDCAD EURCAD GBPCAD AUDCAD NZDCAD",
+    "EURNZD GBPNZD AUDNZD",
+    "EURAUD GBPAUD",
+    "EURGBP",
+    "XAUUSD"};
+
+const ushort SYMBOL_SEPARATOR = ' ';
+GroupStruct GROUPS[];
+int GROUPS_LENGTH = 0;
 
 ///////////////////////////////////// Helper Functions ///////////////////////////
-void clearOrderPriorityList()
+int getMagicNumber(int groupIndex)
 {
-    StrategyResult strategyDefaultVal;
-    for (int i = 0; i < PRIORITY_LIST_MAX; i++)
-    {
-        BUY_PRIORITY_CHECK_LIST[i] = strategyDefaultVal;
-        SELL_PRIORITY_CHECK_LIST[i] = strategyDefaultVal;
-    }
-    priority_index_buy = 0;
-    priority_index_sell = 0;
+    string magicString = IntegerToString(MagicNumber);
+    magicString += IntegerToString(getSessionNumber(TimeCurrent()));
+    magicString += IntegerToString(groupIndex);
+
+    return (int)StringToInteger(magicString);
 }
 
-void addOrderPriority(StrategyResult &value, int OP)
+void debug(string msg)
 {
-    if (OP == OP_BUY)
-    {
-        BUY_PRIORITY_CHECK_LIST[priority_index_buy] = value;
-        priority_index_buy++;
-    }
-    else if (OP == OP_SELL)
-    {
-        SELL_PRIORITY_CHECK_LIST[priority_index_sell] = value;
-        priority_index_sell++;
-    }
-}
-
-// StrategyResult getOrderPriorityOption(int OP, int index)
-// {
-//     return OP == OP_BUY ? BUY_PRIORITY_CHECK_LIST[index] : SELL_PRIORITY_CHECK_LIST[index];
-// }
-
-int orderPriorityListLength(int OP)
-{
-    if (OP == OP_BUY)
-    {
-        return priority_index_buy;
-    }
-    else if (OP == OP_SELL)
-    {
-        return priority_index_sell;
-    }
-
-    return -1;
-}
-
-// This function reduces 2 lists to one list to be processed
-StrategyResult getPrioritizedOrderStrategyResult(int OP)
-{
-    int targetCount = orderPriorityListLength(OP);
-    // Print("Prioriti List Type: ", OP == OP_BUY ? "Buy" : "Sell");
-    return OP == OP_BUY ? prioritizeOrders(BUY_PRIORITY_CHECK_LIST, targetCount) : prioritizeOrders(SELL_PRIORITY_CHECK_LIST, targetCount);
-}
-
-StrategyResult prioritizeOrders(StrategyResult &list[], int count)
-{
-    StrategyResult result;
-
-    // This means we only have one immediate option and should return
-    if (count == 1)
-    {
-        return list[0];
-    }
-
-    /* Olaviatha:
-        1- Immediate be pending tarjih dade mishavad
-        2- Beyne 2 immediate olaviat ba moredi ast ke stoplosse kuchecktari dashte bashad
-    */
-
-    for (int i = 0; i < count; i++)
-    {
-        StrategyResult item = list[i];
-        if (item.orderInfo.valid)
-        {
-            if (result.symbol == "")
-            {
-                result = item;
-                continue;
-            }
-            else
-            {
-                Print(item.symbol, " From Prioritization List");
-
-                // One is immediate
-                if (result.orderInfo.pending && !item.orderInfo.pending)
-                {
-                    result = item;
-                    continue;
-                }
-
-                // Both are immediate or both are pendings
-                if ((!result.orderInfo.pending && !item.orderInfo.pending) /* || (result.orderInfo.pending && item.orderInfo.pending) */)
-                {
-                    // Check mikonim har kodam stoplosseshan chanta average candle size ast?
-                    const double currentSlSize = MathAbs(result.orderInfo.orderPrice - result.orderInfo.slPrice) / result.orderInfo.averageCandleSize;
-                    const double itemSlSize = MathAbs(item.orderInfo.orderPrice - item.orderInfo.slPrice) / item.orderInfo.averageCandleSize;
-                    if (itemSlSize > currentSlSize)
-                    {
-                        result = item;
-                        continue;
-                    }
-                }
-            }
-        }
-    }
-
-    return result;
+    Alert(msg);
+    Print(msg);
+    SendNotification(msg);
 }
