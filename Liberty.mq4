@@ -809,7 +809,22 @@ void listSignals(SignalResult &list[], string symbol, ENUM_TIMEFRAMES lowTF, Ord
     // Find Highest/Lowest candle that belongs to the move as part of the signal
     // 2 vahed check mikonim
 
-    int candleCountBetween = MathAbs(firstAreaTouchShift - item.maChangeShift) + 1;
+    int candleCountBetween = 10; // MathAbs(firstAreaTouchShift - item.maChangeShift) + 1;
+
+    // Mire akhirtarin taghire range hamjahat ro peyda mikone va az onja tedade candlayi ke
+    // bayad baraye peyda kardane balatarin/payintarin noghte begarde ro mohasebe mikone
+    for (int step = 3; step < 200; step += 3)
+    {
+      LowMaChangeResult maDir = getLowerMaDirection(symbol, lowTF, item.maChangeShift + step);
+      if ((orderEnv == ENV_SELL && maDir.dir == MA_DOWN) || (orderEnv == ENV_BUY && maDir.dir == MA_UP))
+      {
+        if (step > candleCountBetween)
+        {
+          candleCountBetween = step;
+        }
+        break;
+      }
+    }
 
     if (orderEnv == ENV_SELL)
     {
@@ -971,18 +986,21 @@ OrderInfoResult validateOrderDistance(string symbol, ENUM_TIMEFRAMES tf, OrderEn
         }
 
         // Correcting Stoploss place
-        if (orderEnv == ENV_SELL)
+        if (signalToProcess.maChangeShift != firstAreaTouchShift)
         {
-          int highestFromFirstTouch = iHighest(symbol, tf, MODE_HIGH, MathAbs(signalToProcess.maChangeShift - firstAreaTouchShift), signalToProcess.maChangeShift);
-          signalToProcess.highestShift = highestFromFirstTouch;
-        }
-        else if (orderEnv == ENV_BUY)
-        {
-          int lowestFromFirstTouch = iLowest(symbol, tf, MODE_LOW, MathAbs(signalToProcess.maChangeShift - firstAreaTouchShift), signalToProcess.maChangeShift);
-          signalToProcess.lowestShift = lowestFromFirstTouch;
-        }
+          if (orderEnv == ENV_SELL)
+          {
+            int highestFromFirstTouch = iHighest(symbol, tf, MODE_HIGH, MathAbs(signalToProcess.maChangeShift - firstAreaTouchShift), signalToProcess.maChangeShift);
+            signalToProcess.highestShift = highestFromFirstTouch;
+          }
+          else if (orderEnv == ENV_BUY)
+          {
+            int lowestFromFirstTouch = iLowest(symbol, tf, MODE_LOW, MathAbs(signalToProcess.maChangeShift - firstAreaTouchShift), signalToProcess.maChangeShift);
+            signalToProcess.lowestShift = lowestFromFirstTouch;
+          }
 
-        indexOrderInfo = signalToOrderInfo(symbol, tf, orderEnv, signalToProcess);
+          indexOrderInfo = signalToOrderInfo(symbol, tf, orderEnv, signalToProcess);
+        }
 
         indexOrderInfo.pending = true;
         indexOrderInfo.valid = true;
@@ -994,7 +1012,7 @@ OrderInfoResult validateOrderDistance(string symbol, ENUM_TIMEFRAMES tf, OrderEn
       indexOrderInfo.valid = true;
     }
 
-    if (signalIndexToValidate == place)
+    if (signalIndexToValidate == place && signal.maChangeShift != firstAreaTouchShift)
     {
       // Correcting Stoploss place
       if (orderEnv == ENV_SELL)
@@ -1075,13 +1093,13 @@ int findMostValidSignal(string symbol, ENUM_TIMEFRAMES tf, OrderEnvironment orde
     SignalResult item = signals[i];
     OrderInfoResult signalOrderInfo = signalToOrderInfo(symbol, tf, orderEnv, item);
 
-    if (orderEnv == ENV_SELL && signalOrderInfo.slPrice > mostValidEntry.absoluteSlPrice)
+    if (orderEnv == ENV_SELL && signalOrderInfo.orderPrice > mostValidEntry.absoluteSlPrice)
     {
       mostValidEntrySignal = item;
       mostValidEntry = signalOrderInfo;
       place = i;
     }
-    else if (orderEnv == ENV_BUY && signalOrderInfo.slPrice < mostValidEntry.absoluteSlPrice)
+    else if (orderEnv == ENV_BUY && signalOrderInfo.orderPrice < mostValidEntry.absoluteSlPrice)
     {
       mostValidEntrySignal = item;
       mostValidEntry = signalOrderInfo;
