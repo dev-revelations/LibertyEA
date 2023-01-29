@@ -14,8 +14,11 @@ extern bool EnableEATimer = true;                                        // Enab
 extern int EATimerSconds = 1;                                            // EA Timer Interval Seconds
 extern bool CheckSignalsOnNewCandle = true;                              // Check for signals on new candle openning
 extern string _separator1_2 = "======================================="; // ===== Average Candle Size Settings =====
-extern double AverageCandleSizeRatio = 2.25;
 extern int AverageCandleSizePeriod = 40;
+extern double PendingThresholdAverageCandleSizeRatio = 2.25;             // Pending Threshold In Average Candle Size Ratio
+extern int CustomACSTimeStart = 0;                                       // Custom Pending ACS Start
+extern int CustomACSTimeEnd = 7;                                         // Custom Pending ACS End
+extern double CustomPendingThresholdAverageCandleSizeRatio = 3;          // Custom Time Pending Threshold In Average Candle Size Ratio
 extern string _separator1 = "=======================================";   // ===== Higher Timeframe =====
 extern ENUM_TIMEFRAMES higher_timeframe = PERIOD_H4;                     // Higher Timeframe
 extern int MA_Closing_Delay = 2;                                         // Number of higher TF candles should wait
@@ -875,10 +878,10 @@ OrderInfoResult calculeOrderPlace(string symbol, ENUM_TIMEFRAMES tf, OrderEnviro
                                   : iLow(symbol, tf, highestLowestShift);
 
   double averageCandle = averageCandleSize(symbol, tf, signalShift, AverageCandleSizePeriod);
-  double scaledCandleSize = averageCandle * AverageCandleSizeRatio;
-  // debug("scaledCandleSize = ", scaledCandleSize * (MathPow(10, _Digits - 1)), "  averageCandle = ", averageCandle * (MathPow(10, _Digits - 1)));
+  int signalTimeHour = TimeHour(iTime(symbol, tf, signalShift));
+  double pendingThreshold = TimeFilter(CustomACSTimeStart, CustomACSTimeEnd, signalTimeHour) ? CustomPendingThresholdAverageCandleSizeRatio : PendingThresholdAverageCandleSizeRatio;
+  double scaledCandleSize = averageCandle * pendingThreshold;
 
-  // double gapSizeInPoint = pipToPoint(symbol, StoplossGapInPip);
   double gapSizeInPoint = averageCandle * StopLossGapInAverageCandleSize;
 
   orderInfo.originalPrice = price;
@@ -1096,13 +1099,13 @@ int findMostValidSignal(string symbol, ENUM_TIMEFRAMES tf, OrderEnvironment orde
     SignalResult item = signals[i];
     OrderInfoResult signalOrderInfo = signalToOrderInfo(symbol, tf, orderEnv, item);
 
-    if (orderEnv == ENV_SELL && signalOrderInfo.orderPrice > mostValidEntry.absoluteSlPrice)
+    if (orderEnv == ENV_SELL && signalOrderInfo.orderPrice > mostValidEntry.orderPrice)
     {
       mostValidEntrySignal = item;
       mostValidEntry = signalOrderInfo;
       place = i;
     }
-    else if (orderEnv == ENV_BUY && signalOrderInfo.orderPrice < mostValidEntry.absoluteSlPrice)
+    else if (orderEnv == ENV_BUY && signalOrderInfo.orderPrice < mostValidEntry.orderPrice)
     {
       mostValidEntrySignal = item;
       mostValidEntry = signalOrderInfo;
