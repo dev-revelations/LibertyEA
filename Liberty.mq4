@@ -888,6 +888,9 @@ OrderInfoResult calculeOrderPlace(string symbol, ENUM_TIMEFRAMES tf, OrderEnviro
 
   orderInfo.averageCandleSize = averageCandle;
 
+  double marketAsk = SymbolInfoDouble(symbol, SYMBOL_ASK);
+  double marketBid = SymbolInfoDouble(symbol, SYMBOL_BID);
+
   if (orderEnv == ENV_SELL)
   {
     orderInfo.absoluteSlPrice = highestLowestPrice;
@@ -900,6 +903,12 @@ OrderInfoResult calculeOrderPlace(string symbol, ENUM_TIMEFRAMES tf, OrderEnviro
     orderInfo.pendingOrderPrice = stopLossToScaledCandleSize;
     double priceSlDistance = MathAbs(orderInfo.orderPrice - orderInfo.slPrice);
     orderInfo.tpPrice = orderInfo.orderPrice - (priceSlDistance * TakeProfitRatio);
+
+    if (orderInfo.orderPrice <= marketAsk && orderInfo.orderPrice >= marketBid)
+    {
+      orderInfo.orderPrice = marketBid;
+      orderInfo.pending = false;
+    }
   }
   else if (orderEnv == ENV_BUY)
   {
@@ -913,6 +922,12 @@ OrderInfoResult calculeOrderPlace(string symbol, ENUM_TIMEFRAMES tf, OrderEnviro
     orderInfo.pendingOrderPrice = stopLossToScaledCandleSize;
     double priceSlDistance = MathAbs(orderInfo.orderPrice - orderInfo.slPrice);
     orderInfo.tpPrice = orderInfo.orderPrice + (priceSlDistance * TakeProfitRatio);
+
+    if (orderInfo.orderPrice <= marketAsk && orderInfo.orderPrice >= marketBid)
+    {
+      orderInfo.orderPrice = marketAsk;
+      orderInfo.pending = false;
+    }
   }
 
   return orderInfo;
