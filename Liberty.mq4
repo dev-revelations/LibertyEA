@@ -5,11 +5,10 @@
 //+------------------------------------------------------------------+
 #property copyright "Copyright 2022, MetaQuotes Software Corp."
 #property link "https://www.mql5.com"
-#property version "1.10"
+#property version "1.11"
 #property strict
 
 extern bool SingleChart = false; // Single Chart Scan
-// extern bool PrioritizeSameGroup = true;                                  // Prioritize Same Group Symbols
 extern bool EnableEATimer = true;                                        // Enable EA Timer
 extern int EATimerSconds = 1;                                            // EA Timer Interval Seconds
 extern bool CheckSignalsOnNewCandle = true;                              // Check for signals on new candle openning
@@ -24,6 +23,7 @@ extern ENUM_TIMEFRAMES higher_timeframe = PERIOD_H4;                     // High
 extern int MA_Closing_Delay = 2;                                         // Number of higher TF candles should wait
 extern double MA_Touch_Thickness_Ratio = 0.2;                            // Higher MA Touch Thickness Ratio in Average Candle Size
 extern double MA_Crossing_Opening_Ratio = 0.5;                           // MA Cross Openning Size Ratio in Average Candle Size
+extern double MA_Crossing_Opening_Ratio_Env_Change = 0.2;                // MA Cross Openning Size Ratio For Environment Change in ACS
 extern string _separator1_1 = "======================================="; // ===== Lower Timeframe =====
 extern ENUM_TIMEFRAMES lower_timeframe = PERIOD_M5;                      // Lower Timeframe (Never select current)
 extern bool OnlyMaCandleBreaks = true;                                   // Shohld candle break MA?
@@ -422,7 +422,7 @@ OrderInfoResult getSymbolEntry(string symbol, ENUM_TIMEFRAMES currentTF, int fir
   return result;
 }
 
-HigherTFCrossCheckResult findHigherTimeFrameMACross(string symbol, ENUM_TIMEFRAMES higherTF, bool findVirtualCross = false)
+HigherTFCrossCheckResult findHigherTimeFrameMACross(string symbol, ENUM_TIMEFRAMES higherTF, bool findVirtualCross = false, double customCrossingOpeningRatio = -1)
 {
   HigherTFCrossCheckResult result;
 
@@ -498,7 +498,8 @@ HigherTFCrossCheckResult findHigherTimeFrameMACross(string symbol, ENUM_TIMEFRAM
     {
       if (!findVirtualCross)
       {
-        double openningSizeRatio = averageCandleSize(symbol, lower_timeframe, i, AverageCandleSizePeriod) * MA_Crossing_Opening_Ratio;
+        double crossingOpeningRatio = customCrossingOpeningRatio > -1 ? customCrossingOpeningRatio : MA_Crossing_Opening_Ratio;
+        double openningSizeRatio = averageCandleSize(symbol, lower_timeframe, i, AverageCandleSizePeriod) * crossingOpeningRatio;
         double openningSize = MathAbs(MA5_current - MA10_current);
         if (openningSize < openningSizeRatio)
         {

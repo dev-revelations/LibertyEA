@@ -292,7 +292,7 @@ bool deleteOrderIfEnvironmentChanged()
 
     if (OrderMagicNumber() == getMagicNumber(groupIndex))
     {
-        HigherTFCrossCheckResult maCross = findHigherTimeFrameMACross(symbol, higher_timeframe);
+        HigherTFCrossCheckResult maCross = findHigherTimeFrameMACross(symbol, higher_timeframe, false, MA_Crossing_Opening_Ratio_Env_Change);
         if (maCross.found && (int)maCross.crossTime > -1)
         {
             int orderTime = (int)OrderOpenTime();
