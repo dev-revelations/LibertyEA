@@ -5,7 +5,7 @@
 //+------------------------------------------------------------------+
 #property copyright "Copyright 2022, MetaQuotes Software Corp."
 #property link "https://www.mql5.com"
-#property version "1.00"
+#property version "1.10"
 #property strict
 
 extern bool SingleChart = false; // Single Chart Scan
@@ -33,7 +33,7 @@ extern double RiskPercent = 1;
 extern double TakeProfitRatio = 3;
 extern double StopLossGapInAverageCandleSize = 0.2;
 // extern double StoplossGapInPip = 2;
-extern int PendingsExpirationMinutes = 300;
+extern int PendingsExpirationMinutes = 10000;
 extern string CommentText = "";
 extern bool EnableBreakEven = true;                                      // Enable Break Even
 extern double BreakEvenRatio = 2.75;                                     // Break Even Ratio

@@ -232,7 +232,7 @@ void simulate(string symbol, ENUM_TIMEFRAMES low_tf, int groupIndex)
                                     if (symbol == OrderSymbol() && OrderMagicNumber() == getMagicNumber(groupIndex))
                                     {
                                         int openShift = iBarShift(symbol, lower_timeframe, OrderOpenTime());
-                                        drawVLine(chartId, openShift, "history_order_open_" + IntegerToString(openShift), C'255,230,0');
+                                        drawVLine(chartId, openShift, "history_order_open_" + IntegerToString(openShift), isOpPending(OrderType()) ? C'135,97,1' : C'255,230,0');
                                     }
                                 }
                             }
