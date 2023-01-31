@@ -8,7 +8,7 @@
 #property version "1.11"
 #property strict
 
-extern bool SingleChart = false; // Single Chart Scan
+extern bool SingleChart = false;                                         // Single Chart Scan
 extern bool EnableEATimer = true;                                        // Enable EA Timer
 extern int EATimerSconds = 1;                                            // EA Timer Interval Seconds
 extern bool CheckSignalsOnNewCandle = true;                              // Check for signals on new candle openning
@@ -1206,63 +1206,17 @@ void initializeGroups()
     ArrayResize(group.bars, group.symbols_count);
     ArrayFill(group.bars, 0, group.symbols_count, 0);
 
+    ArrayResize(group.barsHigher, group.symbols_count);
+    ArrayFill(group.barsHigher, 0, group.symbols_count, 0);
+
     ArrayResize(group.MA10, group.symbols_count);
     ArrayResize(group.MA5, group.symbols_count);
 
-    // Check mikonim agar zamane baz shodane EA orderhaye bazi dashtim ke marboot be symbol bud
-    // An symbol ra be onvane active symbole marboot be group set mikonim
-    // for (int symIndex = 0; symIndex < group.symbols_count; symIndex++)
-    // {
-    //   string sym = group.symbols[symIndex];
-    //   int ticket = selectOpenOrderTicketFor(sym, group.groupIndex);
-    //   if (ticket > -1 && OrderSelect(ticket, SELECT_BY_TICKET) == true && sym == OrderSymbol() && OrderMagicNumber() == getMagicNumber(group.groupIndex))
-    //   {
-    //     int orderSession = getSessionNumber(OrderOpenTime());
-    //     int currentSession = getSessionNumber(TimeCurrent());
-    //     if (sessionsEqual(orderSession, currentSession))
-    //     {
-    //       int OP = OrderType();
-    //       if (OP == OP_SELL || OP == OP_SELLLIMIT || OP == OP_SELLSTOP)
-    //       {
-    //         group.active_symbol_sell = sym;
-    //         StrategyResult sr;
-    //         sr.symbol = sym;
-    //         group.active_strategy_sell = sr;
-    //       }
-    //       else if (OP == OP_BUY || OP == OP_BUYLIMIT || OP == OP_BUYSTOP)
-    //       {
-    //         group.active_symbol_buy = sym;
-    //         StrategyResult sr;
-    //         sr.symbol = sym;
-    //         group.active_strategy_buy = sr;
-    //       }
-    //       debug(" Has Open order " + sym);
-    //       break;
-    //     }
-    //   }
-
-    //   if (symbolHasProfitInCurrentCrossing(sym, group.groupIndex))
-    //   {
-    //     int orderSession = getSessionNumber(OrderOpenTime());
-    //     int currentSession = getSessionNumber(TimeCurrent());
-
-    //     if (sessionsEqual(orderSession, currentSession))
-    //     {
-    //       int OP = OrderType();
-    //       if (OP == OP_SELL || OP == OP_SELLLIMIT || OP == OP_SELLSTOP)
-    //       {
-    //         group.active_symbol_sell = sym;
-    //       }
-    //       else if (OP == OP_BUY || OP == OP_BUYLIMIT || OP == OP_BUYSTOP)
-    //       {
-    //         group.active_symbol_buy = sym;
-    //       }
-    //       debug(" Had Profit " + sym);
-    //       break;
-    //     }
-    //   }
-
-    // }
+    for (int symIndex = 0; symIndex < group.symbols_count; symIndex++)
+    {
+      string sym = group.symbols[symIndex];
+      group.barsHigher[symIndex] = iBars(sym, higher_timeframe);
+    }
 
     GROUPS[i] = group;
   }

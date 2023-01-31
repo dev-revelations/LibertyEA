@@ -290,44 +290,59 @@ bool deleteOrderIfEnvironmentChanged()
 
     string symbol = OrderSymbol();
 
-    if (OrderMagicNumber() == getMagicNumber(groupIndex))
+    GroupStruct group = GROUPS[groupIndex];
+
+    int symbolIdx = getSymbolIndex(symbol, groupIndex);
+
+    // Checks only when a new higher timeframe candle opens
+    int bars = iBars(symbol, higher_timeframe);
+
+    if (symbolIdx > -1 && group.barsHigher[symbolIdx] != bars)
     {
-        HigherTFCrossCheckResult maCross = findHigherTimeFrameMACross(symbol, higher_timeframe, false, MA_Crossing_Opening_Ratio_Env_Change);
-        if (maCross.found && (int)maCross.crossTime > -1)
+        GROUPS[groupIndex].barsHigher[symbolIdx] = bars;
+
+        if (OrderMagicNumber() == getMagicNumber(groupIndex))
         {
-            int orderTime = (int)OrderOpenTime();
-            int cross_Time = (int)maCross.crossTime;
-
-            // Environment avaz shode ?
-            int OP = OrderType();
-
-            bool orderTypeDifferentThanCrossEnv = maCross.orderEnvironment == ENV_BUY && (OP == OP_SELL || OP == OP_SELLSTOP || OP == OP_SELLLIMIT);
-            orderTypeDifferentThanCrossEnv = orderTypeDifferentThanCrossEnv || (maCross.orderEnvironment == ENV_SELL && (OP == OP_BUY || OP == OP_BUYSTOP || OP == OP_BUYLIMIT));
-
-            if (orderTime < cross_Time || orderTypeDifferentThanCrossEnv /* && !(virtualMACross.found) */)
+            HigherTFCrossCheckResult maCross = findHigherTimeFrameMACross(symbol, higher_timeframe, false, MA_Crossing_Opening_Ratio_Env_Change);
+            if (maCross.found && (int)maCross.crossTime > -1)
             {
-                if (OP == OP_BUY || OP == OP_SELL)
+                int orderTime = (int)OrderOpenTime();
+                int cross_Time = (int)maCross.crossTime;
+
+                // Environment avaz shode ?
+                int OP = OrderType();
+
+                bool orderTypeDifferentThanCrossEnv = maCross.orderEnvironment == ENV_BUY && (OP == OP_SELL || OP == OP_SELLSTOP || OP == OP_SELLLIMIT);
+                orderTypeDifferentThanCrossEnv = orderTypeDifferentThanCrossEnv || (maCross.orderEnvironment == ENV_SELL && (OP == OP_BUY || OP == OP_BUYSTOP || OP == OP_BUYLIMIT));
+
+                if (orderTime < cross_Time || orderTypeDifferentThanCrossEnv /* && !(virtualMACross.found) */)
                 {
-                    OrderClose(
-                        OrderTicket(),                // ticket
-                        OrderLots(),                  // volume
-                        MarketInfo(symbol, MODE_ASK), // close price
-                        3,                            // slippage
-                        clrRed                        // color
-                    );
+                    if (OP == OP_BUY || OP == OP_SELL)
+                    {
+                        OrderClose(
+                            OrderTicket(),                // ticket
+                            OrderLots(),                  // volume
+                            MarketInfo(symbol, MODE_ASK), // close price
+                            3,                            // slippage
+                            clrRed                        // color
+                        );
+                    }
+
+                    if (OP == OP_BUYLIMIT || OP == OP_SELLLIMIT || OP == OP_BUYSTOP || OP == OP_SELLSTOP)
+                    {
+                        OrderDelete(OrderTicket(), clrAzure);
+                    }
+
+                    debug("Deleting Order Due To Change Of Environment " + symbol);
+
+                    return true;
                 }
-
-                if (OP == OP_BUYLIMIT || OP == OP_SELLLIMIT || OP == OP_BUYSTOP || OP == OP_SELLSTOP)
-                {
-                    OrderDelete(OrderTicket(), clrAzure);
-                }
-
-                debug("Deleting Order Due To Change Of Environment " + symbol);
-
-                return true;
             }
         }
+
+        debug(symbol + " Checked for change of environment...");
     }
+
     return false;
 }
 
@@ -431,4 +446,19 @@ bool hasActiveTransaction(string symbol, int groupIndex)
     }
 
     return false;
+}
+
+int getSymbolIndex(string symbol, int groupIndex)
+{
+    GroupStruct group = GROUPS[groupIndex];
+
+    for (int symbolIdx = 0; symbolIdx < group.symbols_count; symbolIdx++)
+    {
+        if (symbol == group.symbols[symbolIdx])
+        {
+            return symbolIdx;
+        }
+    }
+
+    return -1;
 }

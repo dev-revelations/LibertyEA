@@ -116,6 +116,7 @@ struct GroupStruct
     string active_symbol_sell;
     int symbols_count;
     int bars[];
+    int barsHigher[];
     StrategyResult active_strategy_buy;
     StrategyResult active_strategy_sell;
     MA_Array MA5[];
