@@ -119,6 +119,8 @@ void runEA()
 {
   processOrders();
 
+  orderLinesSimulation();
+
   if (!IsTradeAllowed())
   {
     return;
