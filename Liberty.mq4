@@ -944,12 +944,14 @@ OrderInfoResult signalToOrderInfo(string symbol, ENUM_TIMEFRAMES tf, OrderEnviro
   OrderInfoResult orderCalculated;
   if (orderEnv == ENV_SELL && signal.highestShift > -1)
   {
-    double price = useVirtualPrice ? iLow(symbol, tf, signal.maChangeShift) : MarketInfo(symbol, MODE_BID);
+    double low = MathMin(iOpen(symbol, tf, signal.maChangeShift), iClose(symbol, tf, signal.maChangeShift)); // iLow(symbol, tf, signal.maChangeShift)
+    double price = useVirtualPrice ? low : MarketInfo(symbol, MODE_BID);
     orderCalculated = calculeOrderPlace(symbol, tf, orderEnv, signal.maChangeShift, signal.highestShift, price);
   }
   else if (orderEnv == ENV_BUY && signal.lowestShift > -1)
   {
-    double price = useVirtualPrice ? iHigh(symbol, tf, signal.maChangeShift) : MarketInfo(symbol, MODE_ASK);
+    double high = MathMax(iOpen(symbol, tf, signal.maChangeShift), iClose(symbol, tf, signal.maChangeShift)); // iHigh(symbol, tf, signal.maChangeShift)
+    double price = useVirtualPrice ? high : MarketInfo(symbol, MODE_ASK);
     orderCalculated = calculeOrderPlace(symbol, tf, orderEnv, signal.maChangeShift, signal.lowestShift, price);
   }
   return orderCalculated;
@@ -1120,13 +1122,13 @@ int findMostValidSignalIndex(string symbol, ENUM_TIMEFRAMES tf, OrderEnvironment
     SignalResult item = signals[i];
     OrderInfoResult signalOrderInfo = signalToOrderInfo(symbol, tf, orderEnv, item);
 
-    if (orderEnv == ENV_SELL && signalOrderInfo.orderPrice > mostValidEntry.orderPrice)
+    if (orderEnv == ENV_SELL && signalOrderInfo.originalPrice > mostValidEntry.originalPrice)
     {
       mostValidEntrySignal = item;
       mostValidEntry = signalOrderInfo;
       place = i;
     }
-    else if (orderEnv == ENV_BUY && signalOrderInfo.orderPrice < mostValidEntry.orderPrice)
+    else if (orderEnv == ENV_BUY && signalOrderInfo.originalPrice < mostValidEntry.originalPrice)
     {
       mostValidEntrySignal = item;
       mostValidEntry = signalOrderInfo;
