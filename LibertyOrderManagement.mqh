@@ -116,7 +116,10 @@ int selectOpenOrderTicketFor(string symbol, int groupIndex, bool finalizedOrders
         if (OrderSelect(pos, SELECT_BY_POS) == false)
             continue;
 
-        bool found = symbol == OrderSymbol() && OrderMagicNumber() == getMagicNumber(groupIndex);
+        int currentSession = getSessionNumber(TimeCurrent());
+        int orderSession = getSessionNumber(OrderOpenTime());
+
+        bool found = symbol == OrderSymbol() && OrderMagicNumber() == getMagicNumber(groupIndex) && sessionsEqual(currentSession, orderSession);
 
         if (!finalizedOrdersOnly && found)
         {
