@@ -17,7 +17,7 @@ extern int AverageCandleSizePeriod = 40;
 extern double PendingThresholdAverageCandleSizeRatio = 2.25;             // Pending Threshold In Average Candle Size Ratio
 extern int CustomACSTimeStart = 0;                                       // Custom Pending ACS Start
 extern int CustomACSTimeEnd = 7;                                         // Custom Pending ACS End
-extern double CustomPendingThresholdAverageCandleSizeRatio = 3.75;          // Custom Time Pending Threshold In Average Candle Size Ratio
+extern double CustomPendingThresholdAverageCandleSizeRatio = 3.75;       // Custom Time Pending Threshold In Average Candle Size Ratio
 extern string _separator1 = "=======================================";   // ===== Higher Timeframe =====
 extern ENUM_TIMEFRAMES higher_timeframe = PERIOD_H4;                     // Higher Timeframe
 extern int MA_Closing_Delay = 2;                                         // Number of higher TF candles should wait
@@ -880,8 +880,10 @@ OrderInfoResult calculeOrderPlace(string symbol, ENUM_TIMEFRAMES tf, OrderEnviro
                                   ? iHigh(symbol, tf, highestLowestShift)
                                   : iLow(symbol, tf, highestLowestShift);
 
-  double averageCandle = averageCandleSize(symbol, tf, signalShift, AverageCandleSizePeriod);
   int signalTimeHour = TimeHour(iTime(symbol, tf, signalShift));
+  int nowTimeHour = TimeHour(TimeCurrent());
+  const int acsShift = TimeFilter(CustomACSTimeStart, CustomACSTimeEnd, nowTimeHour) ? 0 : signalShift;
+  double averageCandle = averageCandleSize(symbol, tf, acsShift, AverageCandleSizePeriod);
   double pendingThreshold = TimeFilter(CustomACSTimeStart, CustomACSTimeEnd, signalTimeHour) ? CustomPendingThresholdAverageCandleSizeRatio : PendingThresholdAverageCandleSizeRatio;
   double scaledCandleSize = averageCandle * pendingThreshold;
 
