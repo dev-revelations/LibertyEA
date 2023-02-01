@@ -16,6 +16,9 @@ void processOrders()
         if (deleteOrderIfEnvironmentChanged())
             continue;
 
+        if (deleteAllNotBelongsToEA())
+            continue;
+
         if (EnableBreakEven)
         {
             checkForBreakEven(OrderSymbol(), pos);
@@ -282,6 +285,41 @@ bool deleteSellStopBuyStopIfHitStoploss()
     }
 
     return couldDelete;
+}
+
+bool deleteAllNotBelongsToEA()
+{
+    int groupIndex = OrderMagicNumber() % 10;
+
+    string symbol = OrderSymbol();
+
+    if (OrderMagicNumber() != getMagicNumber(groupIndex))
+    {
+
+        int OP = OrderType();
+
+        if (OP == OP_BUY || OP == OP_SELL)
+        {
+            OrderClose(
+                OrderTicket(),                // ticket
+                OrderLots(),                  // volume
+                MarketInfo(symbol, MODE_ASK), // close price
+                3,                            // slippage
+                clrRed                        // color
+            );
+        }
+
+        if (OP == OP_BUYLIMIT || OP == OP_SELLLIMIT || OP == OP_BUYSTOP || OP == OP_SELLSTOP)
+        {
+            OrderDelete(OrderTicket(), clrAzure);
+        }
+
+        debug("Deleting order. Does not belong to EA: " + symbol);
+
+        return true;
+    }
+
+    return false;
 }
 
 bool deleteOrderIfEnvironmentChanged()

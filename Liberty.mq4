@@ -17,7 +17,7 @@ extern int AverageCandleSizePeriod = 40;
 extern double PendingThresholdAverageCandleSizeRatio = 2.25;             // Pending Threshold In Average Candle Size Ratio
 extern int CustomACSTimeStart = 0;                                       // Custom Pending ACS Start
 extern int CustomACSTimeEnd = 7;                                         // Custom Pending ACS End
-extern double CustomPendingThresholdAverageCandleSizeRatio = 3;          // Custom Time Pending Threshold In Average Candle Size Ratio
+extern double CustomPendingThresholdAverageCandleSizeRatio = 3.75;          // Custom Time Pending Threshold In Average Candle Size Ratio
 extern string _separator1 = "=======================================";   // ===== Higher Timeframe =====
 extern ENUM_TIMEFRAMES higher_timeframe = PERIOD_H4;                     // Higher Timeframe
 extern int MA_Closing_Delay = 2;                                         // Number of higher TF candles should wait
@@ -404,7 +404,7 @@ OrderInfoResult getSymbolEntry(string symbol, ENUM_TIMEFRAMES currentTF, int fir
     else if (lastSignal.maChangeShift > 2 && foundInvalid == false)
     {
       // if last signal is not hapenning now, find the latest valid signal and set a pending order for it
-      int latestValidSignalIndex = findMostValidSignal(symbol, currentTF, maCross.orderEnvironment, signals);
+      int latestValidSignalIndex = findMostValidSignalIndex(symbol, currentTF, maCross.orderEnvironment, signals);
       if (latestValidSignalIndex > -1)
       {
         SignalResult latestValidSignal = signals[latestValidSignalIndex];
@@ -962,7 +962,7 @@ OrderInfoResult validateOrderDistance(string symbol, ENUM_TIMEFRAMES tf, OrderEn
   if (signalIndexToValidate >= 0)
   {
     // Find highest/lowest entry price in the past
-    int place = findMostValidSignal(symbol, tf, orderEnv, signals, signalIndexToValidate);
+    int place = findMostValidSignalIndex(symbol, tf, orderEnv, signals, signalIndexToValidate);
     SignalResult mostValidEntrySignal = signals[place];
     OrderInfoResult mostValidEntry = signalToOrderInfo(symbol, tf, orderEnv, mostValidEntrySignal);
 
@@ -1102,7 +1102,7 @@ OrderInfoResult validateOrderDistanceToCurrentCandle(string symbol, ENUM_TIMEFRA
   return entry;
 }
 
-int findMostValidSignal(string symbol, ENUM_TIMEFRAMES tf, OrderEnvironment orderEnv, SignalResult &signals[], int limitIndex = -1)
+int findMostValidSignalIndex(string symbol, ENUM_TIMEFRAMES tf, OrderEnvironment orderEnv, SignalResult &signals[], int limitIndex = -1)
 {
   // Find highest/lowest entry price in the past
   if (limitIndex <= -1)
