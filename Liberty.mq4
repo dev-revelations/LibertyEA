@@ -38,6 +38,7 @@ extern string CommentText = "";
 extern bool EnableBreakEven = true;                                      // Enable Break Even
 extern double BreakEvenRatio = 2.75;                                     // Break Even Ratio
 extern double BreakEvenGapPip = 2;                                       // Break Even Gap Pip
+extern double BuyStopSellStopGapInACS = 0.1;                             // Immediate BuyStop / SellStop Gap in ACS Ratio
 extern string _separator4 = "=======================================";   // ===== Sessions (Min = 0 , Max = 24) =====
 extern int GMTOffset = 2;                                                // GMT Offset
 extern bool EnableTradingSession1 = true;                                // Enable Trading in Session 1

@@ -50,8 +50,11 @@ int Order(string symbol, OrderEnvironment orderEnv, OrderInfoResult &orderInfo, 
         }
         else
         {
+            double gapSizeInPoints = getBuystopSellstopGapInPoints(symbol);
             // Make sure price matches the market price
-            price = NormalizeDouble(marketPrice, digits);
+            price = NormalizeDouble(marketPrice + gapSizeInPoints, digits);
+            // Converting Immediates as BuyStop or SellStop
+            OP = OP_BUYSTOP;
         }
     }
     else if (orderEnv == ENV_SELL)
@@ -67,8 +70,11 @@ int Order(string symbol, OrderEnvironment orderEnv, OrderInfoResult &orderInfo, 
         }
         else
         {
+            double gapSizeInPoints = getBuystopSellstopGapInPoints(symbol);
             // Make sure price matches the market price
-            price = NormalizeDouble(marketPrice, digits);
+            price = NormalizeDouble(marketPrice - gapSizeInPoints, digits);
+            // Converting Immediates as BuyStop or SellStop
+            OP = OP_SELLSTOP;
         }
     }
     else
@@ -137,4 +143,11 @@ string getOpName(int OP)
     default:
         return "NONE";
     }
+}
+
+double getBuystopSellstopGapInPoints(string symbol)
+{
+    double averageCandle = averageCandleSize(symbol, lower_timeframe, 0, AverageCandleSizePeriod);
+    double gap = averageCandle * BuyStopSellStopGapInACS;
+    return gap >= 0 ? gap : 0;
 }
