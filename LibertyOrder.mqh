@@ -88,7 +88,9 @@ int Order(string symbol, OrderEnvironment orderEnv, OrderInfoResult &orderInfo, 
     double LotSize = GetLotSize(symbol, RiskPercent, price, SL);
 
     if (OP == OP_BUY || OP == OP_SELL)
-        debug(symbol + " Opening Immediate " + (OP == OP_BUY ? "Buy" : "Sell"));
+        debug(symbol + " Opening Immediate " + getOpName(OP));
+    else
+        debug(symbol + " Opening Pending " + getOpName(OP));
 
     int result = OrderSend(
         symbol,
