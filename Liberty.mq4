@@ -386,7 +386,7 @@ OrderInfoResult getSymbolEntry(string symbol, ENUM_TIMEFRAMES currentTF, int fir
     }
 
     // If last signal is hapenning now
-    if (lastSignal.maChangeShift >= 0 && lastSignal.maChangeShift <= 1 && orderCalculated.valid)
+    if (lastSignal.maChangeShift >= 0 && lastSignal.maChangeShift <= 4 && orderCalculated.valid)
     {
       // open signal
       if (!orderCalculated.pending)
