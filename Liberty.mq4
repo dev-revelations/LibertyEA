@@ -1032,12 +1032,12 @@ OrderInfoResult validateOrderDistance(string symbol, ENUM_TIMEFRAMES tf, OrderEn
 
           if (orderEnv == ENV_SELL)
           {
-            int highestFromFirstTouch = iHighest(symbol, tf, MODE_HIGH, MathAbs(startShift - firstAreaTouchShift), startShift);
+            int highestFromFirstTouch = iHighest(symbol, tf, MODE_HIGH, MathAbs(startShift - firstAreaTouchShift) + 1, startShift);
             signalToProcess.highestShift = highestFromFirstTouch;
           }
           else if (orderEnv == ENV_BUY)
           {
-            int lowestFromFirstTouch = iLowest(symbol, tf, MODE_LOW, MathAbs(startShift - firstAreaTouchShift), startShift);
+            int lowestFromFirstTouch = iLowest(symbol, tf, MODE_LOW, MathAbs(startShift - firstAreaTouchShift) + 1, startShift);
             signalToProcess.lowestShift = lowestFromFirstTouch;
           }
 
@@ -1066,12 +1066,12 @@ OrderInfoResult validateOrderDistance(string symbol, ENUM_TIMEFRAMES tf, OrderEn
       // Correcting Stoploss place
       if (orderEnv == ENV_SELL)
       {
-        int highestFromFirstTouch = iHighest(symbol, tf, MODE_HIGH, MathAbs(startShift - firstAreaTouchShift), startShift);
+        int highestFromFirstTouch = iHighest(symbol, tf, MODE_HIGH, MathAbs(startShift - firstAreaTouchShift) + 1, startShift);
         signal.highestShift = highestFromFirstTouch;
       }
       else if (orderEnv == ENV_BUY)
       {
-        int lowestFromFirstTouch = iLowest(symbol, tf, MODE_LOW, MathAbs(startShift - firstAreaTouchShift), startShift);
+        int lowestFromFirstTouch = iLowest(symbol, tf, MODE_LOW, MathAbs(startShift - firstAreaTouchShift) + 1, startShift);
         signal.lowestShift = lowestFromFirstTouch;
       }
 
