@@ -18,6 +18,8 @@ extern double PendingThresholdAverageCandleSizeRatio = 2.25;             // Pend
 extern int CustomACSTimeStart = 0;                                       // Custom Pending ACS Start
 extern int CustomACSTimeEnd = 7;                                         // Custom Pending ACS End
 extern double CustomPendingThresholdAverageCandleSizeRatio = 3.75;       // Custom Time Pending Threshold In Average Candle Size Ratio
+extern string _separator1_3 = "======================================="; // ===== Validation Settings =====
+extern double ValidationTpHitSizeAcsRatio = 2.75;                        // Validation TP Hit Size In ACS
 extern string _separator1 = "=======================================";   // ===== Higher Timeframe =====
 extern ENUM_TIMEFRAMES higher_timeframe = PERIOD_H4;                     // Higher Timeframe
 extern int MA_Closing_Delay = 2;                                         // Number of higher TF candles should wait
@@ -369,7 +371,7 @@ OrderInfoResult getSymbolEntry(string symbol, ENUM_TIMEFRAMES currentTF, int fir
     OrderInfoResult orderCalculated = signalToOrderInfo(symbol, currentTF, maCross.orderEnvironment, lastSignal);
     // Try to find an invalid order before last signal
     bool foundInvalid = false;
-    for (int sIdx = 0; sIdx < lastSignalIndex; sIdx++)
+    for (int sIdx = 0; sIdx <= lastSignalIndex; sIdx++)
     {
       OrderInfoResult validatedOrder = validateOrderDistance(symbol, currentTF, maCross.orderEnvironment, firstAreaTouchShift, signals, sIdx);
       if (validatedOrder.valid == false)
@@ -981,7 +983,7 @@ OrderInfoResult validateOrderDistance(string symbol, ENUM_TIMEFRAMES tf, OrderEn
     {
       bool isValidPriceDistance = true;
       int candlesCountFromMostValidEntry = MathAbs(mostValidEntrySignal.maChangeShift - signal.maChangeShift);
-      const double mostValidBreakevenSize = MathAbs(mostValidEntry.orderPrice - mostValidEntry.slPrice) * BreakEvenRatio;
+      const double mostValidBreakevenSize = MathAbs(mostValidEntry.orderPrice - mostValidEntry.slPrice) * ValidationTpHitSizeAcsRatio;
 
       if (orderEnv == ENV_SELL)
       {
@@ -1093,7 +1095,7 @@ OrderInfoResult validateOrderDistance(string symbol, ENUM_TIMEFRAMES tf, OrderEn
 
         bool isValidPriceDistance = true;
         int candlesCountFromMostValidEntry = MathAbs(mostValidEntrySignal.maChangeShift - signal.maChangeShift);
-        const double mostValidBreakevenSize = MathAbs(mostValidEntry.orderPrice - mostValidEntry.slPrice) * BreakEvenRatio;
+        const double mostValidBreakevenSize = MathAbs(mostValidEntry.orderPrice - mostValidEntry.slPrice) * ValidationTpHitSizeAcsRatio;
 
         if (orderEnv == ENV_SELL)
         {
