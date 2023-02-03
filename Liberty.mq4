@@ -123,27 +123,30 @@ void runEA()
 {
   processOrders();
 
-  orderLinesSimulation();
+  if (IsTradeAllowed())
+  {
 
-  if (!IsTradeAllowed())
-  {
-    return;
+    if (minutesPassed())
+    {
+      initializeMAs();
+    }
+
+    if (SingleChart)
+    {
+      if (secondsPassed(RefreshEverySeconds, simulationTimer))
+      {
+        simulate(_Symbol, lower_timeframe, 0);
+      }
+      runStrategy1(_Symbol, lower_timeframe, higher_timeframe, 0);
+    }
+    else
+    {
+      scanSymbolGroups();
+    }
   }
 
-  if (minutesPassed())
-  {
-    initializeMAs();
-  }
-
-  if (SingleChart)
-  {
-    simulate(_Symbol, lower_timeframe, 0);
-    runStrategy1(_Symbol, lower_timeframe, higher_timeframe, 0);
-  }
-  else
-  {
-    scanSymbolGroups();
-  }
+  if (secondsPassed(RefreshEverySeconds, simulationOrderLineTimer))
+    orderLinesSimulation();
 }
 
 void scanSymbolGroups()
@@ -151,7 +154,7 @@ void scanSymbolGroups()
   string activeSymbolsListBuy = "";
   string activeSymbolsListSell = "";
 
-  bool canRefreshSimulation = secondsPassed(RefreshEverySeconds);
+  bool canRefreshSimulation = secondsPassed(RefreshEverySeconds, simulationTimer);
 
   for (int groupIdx = 0; groupIdx < GROUPS_LENGTH; groupIdx++)
   {

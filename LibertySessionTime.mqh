@@ -1,5 +1,6 @@
 /////////////////////////// Time & Session Helpers ///////////////////////////
-int secondsTimer = 0;
+int simulationTimer = 0;
+int simulationOrderLineTimer = 0;
 
 bool TimeFilter(int start_time, int end_time, int customTimeHour = -1)
 {
@@ -52,7 +53,7 @@ bool minutesPassed()
     return false;
 }
 
-bool secondsPassed(int seconds)
+bool secondsPassed(int seconds, int &secondsTimer)
 {
     int currentTime = (int)TimeLocal();
     int timePassed = (currentTime - secondsTimer);
