@@ -1019,7 +1019,7 @@ OrderInfoResult validateOrderDistance(string symbol, ENUM_TIMEFRAMES tf, OrderEn
         // Correcting Stoploss place
         if (signalToProcess.maChangeShift != firstAreaTouchShift)
         {
-          
+
           int startShift = signal.maChangeShift - 2;
           startShift = startShift >= 0 ? startShift : 0;
 
@@ -1076,6 +1076,38 @@ OrderInfoResult validateOrderDistance(string symbol, ENUM_TIMEFRAMES tf, OrderEn
       indexOrderInfo.valid = true;
 
       signals[signalIndexToValidate] = signal;
+
+      // Validate based on the previous most valid place before current valid one to see if hits the TP
+      // This extra check is for the situations that the current signal is itself the most valid entry
+      // So we check to see if the previous most valid entry has hit the TP earlier or not
+      // If it is touched the TP so we will make it invalid
+      if (signalIndexToValidate > 0)
+      {
+        mostValidIndex = findMostValidSignalIndex(symbol, tf, orderEnv, signals, signalIndexToValidate - 1);
+        mostValidEntrySignal = signals[mostValidIndex];
+        mostValidEntry = signalToOrderInfo(symbol, tf, orderEnv, mostValidEntrySignal);
+
+        bool isValidPriceDistance = true;
+        int candlesCountFromMostValidEntry = MathAbs(mostValidEntrySignal.maChangeShift - signal.maChangeShift);
+        const double mostValidBreakevenSize = MathAbs(mostValidEntry.orderPrice - mostValidEntry.slPrice) * BreakEvenRatio;
+
+        if (orderEnv == ENV_SELL)
+        {
+          int lowestCandleFromMostValid = iLowest(symbol, tf, MODE_LOW, candlesCountFromMostValidEntry, signal.maChangeShift);
+          double lowestPrice = iLow(symbol, tf, lowestCandleFromMostValid);
+          double mostValidEntryBreakevenPrice = mostValidEntry.orderPrice - mostValidBreakevenSize;
+          isValidPriceDistance = (indexOrderInfo.originalPrice > mostValidEntryBreakevenPrice /*mostValidEntry.tpPrice*/) && (lowestPrice > mostValidEntryBreakevenPrice /*mostValidEntry.tpPrice*/);
+        }
+        else if (orderEnv == ENV_BUY)
+        {
+          int highestCandleFromMostValid = iHighest(symbol, tf, MODE_HIGH, candlesCountFromMostValidEntry, signal.maChangeShift);
+          double highestPrice = iHigh(symbol, tf, highestCandleFromMostValid);
+          double mostValidEntryBreakevenPrice = mostValidEntry.orderPrice + mostValidBreakevenSize;
+          isValidPriceDistance = (indexOrderInfo.originalPrice < mostValidEntryBreakevenPrice /*mostValidEntry.tpPrice*/) && (highestPrice < mostValidEntryBreakevenPrice /*mostValidEntry.tpPrice*/);
+        }
+
+        indexOrderInfo.valid = isValidPriceDistance;
+      }
     }
   }
   else
