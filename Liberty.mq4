@@ -59,6 +59,7 @@ extern bool ClearObjects = false; // Clear Objects If Simulation Is Off
 extern int ActiveSignalForTest = 0;
 extern bool ShowTP_SL = false;                // Show TP & SL Lines
 extern bool ShowLinesForOpenedOrders = false; // Show lines for opened orders
+extern int RefreshEverySeconds = 20;          // Refresh Every X seconds
 
 //////////////////////////////////////////////////////////////////////////////
 #include <WinUser32.mqh>
@@ -148,6 +149,8 @@ void scanSymbolGroups()
   string activeSymbolsListBuy = "";
   string activeSymbolsListSell = "";
 
+  bool canRefreshSimulation = secondsPassed(RefreshEverySeconds);
+
   for (int groupIdx = 0; groupIdx < GROUPS_LENGTH; groupIdx++)
   {
 
@@ -173,7 +176,8 @@ void scanSymbolGroups()
     {
       string symbol = group.symbols[symbolIdx];
 
-      simulate(symbol, lower_timeframe, groupIdx);
+      if (canRefreshSimulation)
+        simulate(symbol, lower_timeframe, groupIdx);
 
       if (IsTesting() && _Symbol != symbol)
       {

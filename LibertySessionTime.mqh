@@ -1,4 +1,6 @@
 /////////////////////////// Time & Session Helpers ///////////////////////////
+int secondsTimer = 0;
+
 bool TimeFilter(int start_time, int end_time, int customTimeHour = -1)
 {
     int CurrentHour = TimeHour(TimeCurrent());
@@ -43,6 +45,21 @@ bool minutesPassed()
     if (timePassed >= 1)
     {
         minuteTimer = (int)TimeLocal();
+
+        return true;
+    }
+
+    return false;
+}
+
+bool secondsPassed(int seconds)
+{
+    int currentTime = (int)TimeLocal();
+    int timePassed = (currentTime - secondsTimer);
+
+    if (timePassed >= seconds)
+    {
+        secondsTimer = (int)TimeLocal();
 
         return true;
     }
