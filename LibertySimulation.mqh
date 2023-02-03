@@ -180,8 +180,10 @@ void simulate(string symbol, ENUM_TIMEFRAMES low_tf, int groupIndex)
 
                             // drawVLine(item.lowestShift, IntegerToString(item.lowestShift), C'207,249,0');
 
+                            int validIndex = findMostValidSignalIndex(symbol, low_tf, maCross.orderEnvironment, signals);
+                            SignalResult mostValidSignal = signals[validIndex];
+                            drawVLine(chartId, mostValidSignal.maChangeShift, "most_valid_" + IntegerToString(validIndex), clrBlueViolet);
                             orderCalculated = validateOrderDistance(symbol, low_tf, maCross.orderEnvironment, firstAreaTouchShift, signals, i);
-
                             // Try to find an invalid order before last signal
                             for (int sIdx = 0; sIdx < i; sIdx++)
                             {
