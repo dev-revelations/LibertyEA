@@ -233,11 +233,11 @@ void scanSymbolGroups()
           if (result.orderInfo.valid)
           {
             addOrderPriority(result, OP_BUY);
-            debug("Candid added to priority list (BUY)" + symbol);
+            // debug("Candid added to priority list (BUY)" + symbol);
           }
           else
           {
-            debug("Candid WAS NOT VALID for priority list " + symbol);
+            // debug("Candid WAS NOT VALID for priority list " + symbol);
           }
         }
       }
@@ -249,11 +249,11 @@ void scanSymbolGroups()
           if (result.orderInfo.valid)
           {
             addOrderPriority(result, OP_SELL);
-            debug("Candid added to priority list (SELL)" + symbol);
+            // debug("Candid added to priority list (SELL)" + symbol);
           }
           else
           {
-            debug("Candid WAS NOT VALID for priority list " + symbol);
+            // debug("Candid WAS NOT VALID for priority list " + symbol);
           }
         }
       }
