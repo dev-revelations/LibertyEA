@@ -180,8 +180,10 @@ void simulate(string symbol, ENUM_TIMEFRAMES low_tf, int groupIndex)
 
                             // drawVLine(item.lowestShift, IntegerToString(item.lowestShift), C'207,249,0');
 
+                            int validIndex = findMostValidSignalIndex(symbol, low_tf, maCross.orderEnvironment, signals);
+                            SignalResult mostValidSignal = signals[validIndex];
+                            drawVLine(chartId, mostValidSignal.maChangeShift, "most_valid_" + IntegerToString(validIndex), clrBlueViolet);
                             orderCalculated = validateOrderDistance(symbol, low_tf, maCross.orderEnvironment, firstAreaTouchShift, signals, i);
-
                             // Try to find an invalid order before last signal
                             for (int sIdx = 0; sIdx < i; sIdx++)
                             {
@@ -202,40 +204,6 @@ void simulate(string symbol, ENUM_TIMEFRAMES low_tf, int groupIndex)
                                 drawHLine(chartId, orderCalculated.slPrice, "_sl_" + id, C'255,5,5');
                                 drawHLine(chartId, orderCalculated.tpPrice, "_tp_" + id, C'0,119,255');
                             }
-
-                            if (ShowLinesForOpenedOrders)
-                            {
-                                int total = OrdersTotal();
-                                for (int pos = 0; pos < total; pos++)
-                                {
-                                    if (OrderSelect(pos, SELECT_BY_POS) == false)
-                                        continue;
-
-                                    bool found = symbol == OrderSymbol() && OrderMagicNumber() == getMagicNumber(groupIndex);
-
-                                    if (found)
-                                    {
-                                        int openShift = iBarShift(symbol, lower_timeframe, OrderOpenTime());
-                                        drawVLine(chartId, openShift, "active_order_open_" + IntegerToString(openShift), C'10,203,155');
-                                    }
-                                }
-
-                                int i, hstTotal = OrdersHistoryTotal();
-                                for (i = 0; i < hstTotal; i++)
-                                {
-                                    //---- check selection result
-                                    if (OrderSelect(i, SELECT_BY_POS, MODE_HISTORY) == false)
-                                    {
-                                        continue;
-                                    }
-
-                                    if (symbol == OrderSymbol() && OrderMagicNumber() == getMagicNumber(groupIndex))
-                                    {
-                                        int openShift = iBarShift(symbol, lower_timeframe, OrderOpenTime());
-                                        drawVLine(chartId, openShift, "history_order_open_" + IntegerToString(openShift), C'255,230,0');
-                                    }
-                                }
-                            }
                         }
                     }
                 }
@@ -246,5 +214,42 @@ void simulate(string symbol, ENUM_TIMEFRAMES low_tf, int groupIndex)
     {
         long chartId = findSymbolChart(symbol);
         deleteObjectsAll(chartId);
+    }
+}
+
+void orderLinesSimulation()
+{
+    if (EnableSimulation && ShowLinesForOpenedOrders)
+    {
+        int total = OrdersTotal();
+        for (int pos = 0; pos < total; pos++)
+        {
+            if (OrderSelect(pos, SELECT_BY_POS) == false)
+                continue;
+
+            long chartId = findSymbolChart(OrderSymbol());
+            if (chartId > 0)
+            {
+                int openShift = iBarShift(OrderSymbol(), lower_timeframe, OrderOpenTime());
+                drawVLine(chartId, openShift, "active_order_open_" + IntegerToString(openShift), C'10,203,155');
+            }
+        }
+
+        int i, hstTotal = OrdersHistoryTotal();
+        for (i = 0; i < hstTotal; i++)
+        {
+            //---- check selection result
+            if (OrderSelect(i, SELECT_BY_POS, MODE_HISTORY) == false)
+            {
+                continue;
+            }
+
+            long chartId = findSymbolChart(OrderSymbol());
+            if (chartId > 0)
+            {
+                int openShift = iBarShift(OrderSymbol(), lower_timeframe, OrderOpenTime());
+                drawVLine(chartId, openShift, "history_order_open_" + IntegerToString(openShift), isOpPending(OrderType()) ? C'135,97,1' : C'255,230,0');
+            }
+        }
     }
 }

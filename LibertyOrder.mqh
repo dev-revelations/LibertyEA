@@ -50,8 +50,11 @@ int Order(string symbol, OrderEnvironment orderEnv, OrderInfoResult &orderInfo, 
         }
         else
         {
+            double gapSizeInPoints = getBuystopSellstopGapInPoints(symbol);
             // Make sure price matches the market price
-            price = NormalizeDouble(marketPrice, digits);
+            price = NormalizeDouble(marketPrice + gapSizeInPoints, digits);
+            // Converting Immediates as BuyStop or SellStop
+            OP = OP_BUYSTOP;
         }
     }
     else if (orderEnv == ENV_SELL)
@@ -67,8 +70,11 @@ int Order(string symbol, OrderEnvironment orderEnv, OrderInfoResult &orderInfo, 
         }
         else
         {
+            double gapSizeInPoints = getBuystopSellstopGapInPoints(symbol);
             // Make sure price matches the market price
-            price = NormalizeDouble(marketPrice, digits);
+            price = NormalizeDouble(marketPrice - gapSizeInPoints, digits);
+            // Converting Immediates as BuyStop or SellStop
+            OP = OP_SELLSTOP;
         }
     }
     else
@@ -87,8 +93,10 @@ int Order(string symbol, OrderEnvironment orderEnv, OrderInfoResult &orderInfo, 
 
     double LotSize = GetLotSize(symbol, RiskPercent, price, SL);
 
-    if (OP == OP_BUY || OP == OP_SELL)
-        debug(symbol + " Opening Immediate " + (OP == OP_BUY ? "Buy" : "Sell"));
+    if (orderInfo.pending)
+        debug(symbol + " Opening Pending " + getOpName(OP));
+    else
+        debug(symbol + " Opening Immediate " + getOpName(OP));
 
     int result = OrderSend(
         symbol,
@@ -135,4 +143,11 @@ string getOpName(int OP)
     default:
         return "NONE";
     }
+}
+
+double getBuystopSellstopGapInPoints(string symbol)
+{
+    double averageCandle = averageCandleSize(symbol, lower_timeframe, 0, AverageCandleSizePeriod);
+    double gap = averageCandle * BuyStopSellStopGapInACS;
+    return gap >= 0 ? gap : 0;
 }

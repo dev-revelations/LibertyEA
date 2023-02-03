@@ -1,7 +1,12 @@
 /////////////////////////// Time & Session Helpers ///////////////////////////
-bool TimeFilter(int start_time, int end_time)
+bool TimeFilter(int start_time, int end_time, int customTimeHour = -1)
 {
     int CurrentHour = TimeHour(TimeCurrent());
+
+    if (customTimeHour > -1)
+    {
+        CurrentHour = customTimeHour;
+    }
 
     start_time = start_time + (GMTOffset);
     end_time = end_time + (GMTOffset);
