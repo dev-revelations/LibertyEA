@@ -189,17 +189,8 @@ void scanSymbolGroups()
         continue;
       }
 
-      if (group.active_symbol_buy != "" && group.active_symbol_sell != "")
-      {
-        continue;
-      }
-
-      if (group.active_symbol_buy == symbol || group.active_symbol_sell == symbol)
-      {
-        continue;
-      }
-
       // Check for new bars
+      // This should be one of the first checks and the order of loop ignore checks is important
       if (CheckSignalsOnNewCandle)
       {
         int bars = iBars(symbol, lower_timeframe);
@@ -211,6 +202,16 @@ void scanSymbolGroups()
         {
           group.bars[symbolIdx] = bars;
         }
+      }
+
+      if (group.active_symbol_buy != "" && group.active_symbol_sell != "")
+      {
+        continue;
+      }
+
+      if (group.active_symbol_buy == symbol || group.active_symbol_sell == symbol)
+      {
+        continue;
       }
 
       RefreshRates();
