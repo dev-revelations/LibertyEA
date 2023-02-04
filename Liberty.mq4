@@ -14,10 +14,11 @@ extern int EATimerSconds = 1;                                            // EA T
 extern bool CheckSignalsOnNewCandle = true;                              // Check for signals on new candle openning
 extern string _separator1_2 = "======================================="; // ===== Average Candle Size Settings =====
 extern int AverageCandleSizePeriod = 40;
-extern double PendingThresholdAverageCandleSizeRatio = 2.25;             // Pending Threshold In Average Candle Size Ratio
+extern double PendingThresholdAverageCandleSizeRatio = 2.25;             // PendinCustomPendingThresholdAverageCandleSizeRatiog Threshold In Average Candle Size Ratio
 extern int CustomACSTimeStart = 0;                                       // Custom Pending ACS Start
 extern int CustomACSTimeEnd = 7;                                         // Custom Pending ACS End
 extern double CustomPendingThresholdAverageCandleSizeRatio = 3.75;       // Custom Time Pending Threshold In Average Candle Size Ratio
+extern double CustomTimeHigherMAThicknessRatio = 0.4;                    // Custom Time Higher MA Thickness Ratio in ACS
 extern string _separator1_3 = "======================================="; // ===== Validation Settings =====
 extern double ValidationTpHitSizeAcsRatio = 2.75;                        // Validation TP Hit Size In ACS
 extern string _separator1 = "=======================================";   // ===== Higher Timeframe =====
@@ -564,8 +565,10 @@ bool isAreaTouched(string symbol, ENUM_TIMEFRAMES higherTF, OrderEnvironment ord
 
   // if (actualHigherShift >= 0)
   // {
+  int shiftTimeHour = TimeHour(iTime(symbol, lower_tf, shift));
+  double thicknessRatio = TimeFilter(CustomACSTimeStart, CustomACSTimeEnd, shiftTimeHour) ? CustomTimeHigherMAThicknessRatio : MA_Touch_Thickness_Ratio;
   double h4_ma5 = getLibertyMA(symbol, 5, shift); // getMA(symbol, higherTF, 5, actualHigherShift);
-  double h4_ma5_thickness = averageCandleSize(symbol, lower_tf, shift, AverageCandleSizePeriod) * MA_Touch_Thickness_Ratio;
+  double h4_ma5_thickness = averageCandleSize(symbol, lower_tf, shift, AverageCandleSizePeriod) * thicknessRatio;
   if (orderEnv == ENV_SELL)
   {
     h4_ma5 -= h4_ma5_thickness;
