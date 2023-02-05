@@ -392,8 +392,10 @@ OrderInfoResult getSymbolEntry(string symbol, ENUM_TIMEFRAMES currentTF, int fir
       orderCalculated = validateOrderDistance(symbol, currentTF, maCross.orderEnvironment, firstAreaTouchShift, signals, lastSignalIndex);
     }
 
+    const int immediateRange = 4;
+
     // If last signal is hapenning now
-    if (lastSignal.maChangeShift >= 0 && lastSignal.maChangeShift <= 4 && orderCalculated.valid)
+    if (lastSignal.maChangeShift >= 0 && lastSignal.maChangeShift <= immediateRange && orderCalculated.valid)
     {
       // open signal
       if (!orderCalculated.pending)
@@ -413,7 +415,7 @@ OrderInfoResult getSymbolEntry(string symbol, ENUM_TIMEFRAMES currentTF, int fir
 
       result = orderCalculated;
     }
-    else if (lastSignal.maChangeShift > 2 && foundInvalid == false)
+    else if (lastSignal.maChangeShift > immediateRange && foundInvalid == false)
     {
       // if last signal is not hapenning now, find the latest valid signal and set a pending order for it
       int latestValidSignalIndex = findMostValidSignalIndex(symbol, currentTF, maCross.orderEnvironment, signals);
