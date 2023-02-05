@@ -373,26 +373,10 @@ OrderInfoResult getSymbolEntry(string symbol, ENUM_TIMEFRAMES currentTF, int fir
   {
     SignalResult lastSignal = signals[lastSignalIndex];
     // Validate Signal
-    OrderInfoResult orderCalculated = signalToOrderInfo(symbol, currentTF, maCross.orderEnvironment, lastSignal);
-    // Try to find an invalid order before last signal
-    bool foundInvalid = false;
-    for (int sIdx = 0; sIdx <= lastSignalIndex; sIdx++)
-    {
-      OrderInfoResult validatedOrder = validateOrderDistance(symbol, currentTF, maCross.orderEnvironment, firstAreaTouchShift, signals, sIdx);
-      if (validatedOrder.valid == false)
-      {
-        orderCalculated.valid = false;
-        foundInvalid = true;
-        break;
-      }
-    }
 
-    if (foundInvalid == false)
-    {
-      orderCalculated = validateOrderDistance(symbol, currentTF, maCross.orderEnvironment, firstAreaTouchShift, signals, lastSignalIndex);
-    }
+    OrderInfoResult orderCalculated = validateOrderDistance(symbol, currentTF, maCross.orderEnvironment, firstAreaTouchShift, signals, lastSignalIndex);
 
-    const int immediateRange = 4;
+    const int immediateRange = 2;
 
     // If last signal is hapenning now
     if (lastSignal.maChangeShift >= 0 && lastSignal.maChangeShift <= immediateRange && orderCalculated.valid)
@@ -415,23 +399,15 @@ OrderInfoResult getSymbolEntry(string symbol, ENUM_TIMEFRAMES currentTF, int fir
 
       result = orderCalculated;
     }
-    else if (lastSignal.maChangeShift > immediateRange && foundInvalid == false)
+    else if (lastSignal.maChangeShift > immediateRange)
     {
       // if last signal is not hapenning now, find the latest valid signal and set a pending order for it
       int latestValidSignalIndex = findMostValidSignalIndex(symbol, currentTF, maCross.orderEnvironment, signals);
-      if (latestValidSignalIndex > -1)
-      {
-        SignalResult latestValidSignal = signals[latestValidSignalIndex];
-        int highestShiftBetween = iHighest(symbol, currentTF, MODE_HIGH, latestValidSignal.maChangeShift, 0);
-        double high = iHigh(symbol, currentTF, highestShiftBetween);
-        int lowestShiftBetween = iLowest(symbol, currentTF, MODE_LOW, latestValidSignal.maChangeShift, 0);
-        double low = iLow(symbol, currentTF, lowestShiftBetween);
-        OrderInfoResult latestValidOrder = validateOrderDistanceToCurrentCandle(symbol, currentTF, maCross.orderEnvironment, latestValidSignal);
-        latestValidOrder.valid = latestValidOrder.valid && (maCross.orderEnvironment == ENV_SELL ? (price > latestValidOrder.tpPrice && high < latestValidOrder.slPrice) : (price < latestValidOrder.tpPrice && low > latestValidOrder.slPrice));
-        latestValidOrder.pending = true;
-        result = latestValidOrder;
-        // drawVLine(findSymbolChart(symbol), latestValidSignal.maChangeShift, "sdfdsf", C'255,210,7');
-      }
+      OrderInfoResult latestValidOrder = validateOrderDistance(symbol, currentTF, maCross.orderEnvironment, firstAreaTouchShift, signals, latestValidSignalIndex);
+      latestValidOrder.valid = latestValidOrder.valid && (maCross.orderEnvironment == ENV_SELL ? (price > latestValidOrder.tpPrice) : (price < latestValidOrder.tpPrice));
+      latestValidOrder.pending = true;
+      result = latestValidOrder;
+      // drawVLine(findSymbolChart(symbol), latestValidSignal.maChangeShift, "sdfdsf", C'255,210,7');
     }
   }
 
@@ -981,90 +957,14 @@ OrderInfoResult validateOrderDistance(string symbol, ENUM_TIMEFRAMES tf, OrderEn
 
   OrderInfoResult indexOrderInfo = signalToOrderInfo(symbol, tf, orderEnv, signal);
 
+  indexOrderInfo.valid = false;
+
   if (signalIndexToValidate >= 0)
   {
     // Find highest/lowest entry price in the past
     int mostValidIndex = findMostValidSignalIndex(symbol, tf, orderEnv, signals, signalIndexToValidate);
     SignalResult mostValidEntrySignal = signals[mostValidIndex];
     OrderInfoResult mostValidEntry = signalToOrderInfo(symbol, tf, orderEnv, mostValidEntrySignal);
-
-    if (mostValidEntry.orderPrice > -1 && signalIndexToValidate != mostValidIndex)
-    {
-      bool isValidPriceDistance = true;
-      int candlesCountFromMostValidEntry = MathAbs(mostValidEntrySignal.maChangeShift - signal.maChangeShift);
-      const double mostValidBreakevenSize = MathAbs(mostValidEntry.orderPrice - mostValidEntry.slPrice) * ValidationTpHitSizeAcsRatio;
-
-      if (orderEnv == ENV_SELL)
-      {
-        int lowestCandleFromMostValid = iLowest(symbol, tf, MODE_LOW, candlesCountFromMostValidEntry, signal.maChangeShift);
-        double lowestPrice = iLow(symbol, tf, lowestCandleFromMostValid);
-        double mostValidEntryBreakevenPrice = mostValidEntry.orderPrice - mostValidBreakevenSize;
-        isValidPriceDistance = (indexOrderInfo.originalPrice > mostValidEntryBreakevenPrice /*mostValidEntry.tpPrice*/) && (lowestPrice > mostValidEntryBreakevenPrice /*mostValidEntry.tpPrice*/);
-      }
-      else if (orderEnv == ENV_BUY)
-      {
-        int highestCandleFromMostValid = iHighest(symbol, tf, MODE_HIGH, candlesCountFromMostValidEntry, signal.maChangeShift);
-        double highestPrice = iHigh(symbol, tf, highestCandleFromMostValid);
-        double mostValidEntryBreakevenPrice = mostValidEntry.orderPrice + mostValidBreakevenSize;
-        isValidPriceDistance = (indexOrderInfo.originalPrice < mostValidEntryBreakevenPrice /*mostValidEntry.tpPrice*/) && (highestPrice < mostValidEntryBreakevenPrice /*mostValidEntry.tpPrice*/);
-      }
-
-      // if (signalIndexToValidate == ActiveSignalForTest)
-      // {
-      //   SignalResult item = signals[mostValidIndex];
-      //   drawVLine(item.maChangeShift, IntegerToString(item.maChangeShift), clrRed);
-
-      //   SignalResult sg = signals[signalIndexToValidate];
-      //   drawHLine(mostValidEntry.orderPrice, "orderPrice" + IntegerToString(sg.maChangeShift), C'226,195,43');
-      //   debug("Order Price = ", indexOrderInfo.orderPrice, " mostTP = ", mostValidEntry.tpPrice, " isValidPriceDistance = ", isValidPriceDistance);
-      // }
-
-      // If it is in a valid distance to first entry we will consider that entry as a pending order and replace with current one
-      if (isValidPriceDistance)
-      {
-        // If the highest/lowest found previous signal has higher/lower slPrice will replace it with current signal order info
-        SignalResult signalToProcess = signal;
-        bool shohldReplaceOrderInfo = (orderEnv == ENV_SELL && mostValidEntry.slPrice > indexOrderInfo.slPrice) || (orderEnv == ENV_BUY && mostValidEntry.slPrice < indexOrderInfo.slPrice);
-        if (shohldReplaceOrderInfo)
-        {
-          indexOrderInfo = mostValidEntry;
-          signalToProcess = mostValidEntrySignal;
-        }
-
-        // Correcting Stoploss place
-        if (signalToProcess.maChangeShift != firstAreaTouchShift)
-        {
-
-          int startShift = signal.maChangeShift - 2;
-          startShift = startShift >= 0 ? startShift : 0;
-
-          if (signalIndexToValidate == signalsCount - 1)
-            startShift = 0;
-
-          if (orderEnv == ENV_SELL)
-          {
-            int highestFromFirstTouch = iHighest(symbol, tf, MODE_HIGH, MathAbs(startShift - firstAreaTouchShift) + 1, startShift);
-            signalToProcess.highestShift = highestFromFirstTouch;
-          }
-          else if (orderEnv == ENV_BUY)
-          {
-            int lowestFromFirstTouch = iLowest(symbol, tf, MODE_LOW, MathAbs(startShift - firstAreaTouchShift) + 1, startShift);
-            signalToProcess.lowestShift = lowestFromFirstTouch;
-          }
-
-          indexOrderInfo = signalToOrderInfo(symbol, tf, orderEnv, signalToProcess);
-        }
-
-        indexOrderInfo.valid = true;
-      }
-
-      indexOrderInfo.pending = true;
-    }
-    else
-    {
-      // If nothing found the order itself is valid whatever calculated
-      indexOrderInfo.valid = true;
-    }
 
     if (signalIndexToValidate == mostValidIndex && signal.maChangeShift != firstAreaTouchShift)
     {
@@ -1087,91 +987,75 @@ OrderInfoResult validateOrderDistance(string symbol, ENUM_TIMEFRAMES tf, OrderEn
       }
 
       indexOrderInfo = signalToOrderInfo(symbol, tf, orderEnv, signal);
-      // indexOrderInfo.pending = false;
       indexOrderInfo.valid = true;
+      signal.valid = true;
 
-      signals[signalIndexToValidate] = signal;
+      /**
+       *  General rules:
+       *  From left side : We check to see if we had a TP hitting move or not
+       *  From right side : We check if any higher/lower prices happened after the most valid signal (this means there is a currently happening higher/lower candles without a signal)
+       */
 
-      // Validate based on the previous most valid place before current valid one to see if hits the TP
+      // Left Side: Validate based on the previous most valid place before current valid one to see if hits the TP
       // This extra check is for the situations that the current signal is itself the most valid entry
       // So we check to see if the previous most valid entry has hit the TP earlier or not
       // If it is touched the TP so we will make it invalid
       if (signalIndexToValidate > 0)
       {
-        mostValidIndex = findMostValidSignalIndex(symbol, tf, orderEnv, signals, signalIndexToValidate - 1);
-        mostValidEntrySignal = signals[mostValidIndex];
-        mostValidEntry = signalToOrderInfo(symbol, tf, orderEnv, mostValidEntrySignal);
-
-        bool isValidPriceDistance = true;
-        int candlesCountFromMostValidEntry = MathAbs(mostValidEntrySignal.maChangeShift - signal.maChangeShift);
-        const double mostValidBreakevenSize = MathAbs(mostValidEntry.orderPrice - mostValidEntry.slPrice) * ValidationTpHitSizeAcsRatio;
-
-        if (orderEnv == ENV_SELL)
+        for (int signalIdx = signalIndexToValidate - 1; signalIdx >= 0; signalIdx--)
         {
-          int lowestCandleFromMostValid = iLowest(symbol, tf, MODE_LOW, candlesCountFromMostValidEntry, signal.maChangeShift);
-          double lowestPrice = iLow(symbol, tf, lowestCandleFromMostValid);
-          double mostValidEntryBreakevenPrice = mostValidEntry.orderPrice - mostValidBreakevenSize;
-          isValidPriceDistance = (indexOrderInfo.originalPrice > mostValidEntryBreakevenPrice /*mostValidEntry.tpPrice*/) && (lowestPrice > mostValidEntryBreakevenPrice /*mostValidEntry.tpPrice*/);
-        }
-        else if (orderEnv == ENV_BUY)
-        {
-          int highestCandleFromMostValid = iHighest(symbol, tf, MODE_HIGH, candlesCountFromMostValidEntry, signal.maChangeShift);
-          double highestPrice = iHigh(symbol, tf, highestCandleFromMostValid);
-          double mostValidEntryBreakevenPrice = mostValidEntry.orderPrice + mostValidBreakevenSize;
-          isValidPriceDistance = (indexOrderInfo.originalPrice < mostValidEntryBreakevenPrice /*mostValidEntry.tpPrice*/) && (highestPrice < mostValidEntryBreakevenPrice /*mostValidEntry.tpPrice*/);
+          mostValidIndex = findMostValidSignalIndex(symbol, tf, orderEnv, signals, signalIdx);
+          mostValidEntrySignal = signals[mostValidIndex];
+          mostValidEntry = signalToOrderInfo(symbol, tf, orderEnv, mostValidEntrySignal);
+
+          bool isValidPriceDistance = true;
+          int candlesCountFromMostValidEntry = MathAbs(mostValidEntrySignal.maChangeShift - signal.maChangeShift);
+          const double mostValidBreakevenSize = MathAbs(mostValidEntry.orderPrice - mostValidEntry.slPrice) * ValidationTpHitSizeAcsRatio;
+
+          if (orderEnv == ENV_SELL)
+          {
+            int lowestCandleFromMostValid = iLowest(symbol, tf, MODE_LOW, candlesCountFromMostValidEntry, signal.maChangeShift);
+            double lowestPrice = iLow(symbol, tf, lowestCandleFromMostValid);
+            double mostValidEntryBreakevenPrice = mostValidEntry.orderPrice - mostValidBreakevenSize;
+            isValidPriceDistance = (indexOrderInfo.originalPrice > mostValidEntryBreakevenPrice) && (lowestPrice > mostValidEntryBreakevenPrice);
+          }
+          else if (orderEnv == ENV_BUY)
+          {
+            int highestCandleFromMostValid = iHighest(symbol, tf, MODE_HIGH, candlesCountFromMostValidEntry, signal.maChangeShift);
+            double highestPrice = iHigh(symbol, tf, highestCandleFromMostValid);
+            double mostValidEntryBreakevenPrice = mostValidEntry.orderPrice + mostValidBreakevenSize;
+            isValidPriceDistance = (indexOrderInfo.originalPrice < mostValidEntryBreakevenPrice) && (highestPrice < mostValidEntryBreakevenPrice);
+          }
+
+          indexOrderInfo.valid = indexOrderInfo.valid && isValidPriceDistance;
+          signal.valid = indexOrderInfo.valid;
+
+          // Means it found a case that hits TP
+          if (!isValidPriceDistance)
+            break;
         }
 
-        indexOrderInfo.valid = isValidPriceDistance;
       }
+
+      // Right Side: We check if from the current candle if we had any lower/higher prices than the current most valid signal
+      // If we find one, then the current most valid is not really valid and we shod invalid it and wait for a
+      // new signal to happen
+      if (indexOrderInfo.valid)
+      {
+        double price = orderEnv == ENV_SELL ? MarketInfo(symbol, MODE_BID) : MarketInfo(symbol, MODE_ASK);
+        int highestShiftBetween = iHighest(symbol, tf, MODE_HIGH, signal.maChangeShift - 1, 0);
+        double highestPrice = iHigh(symbol, tf, highestShiftBetween);
+        int lowestShiftBetween = iLowest(symbol, tf, MODE_LOW, signal.maChangeShift - 1, 0);
+        double lowestPrice = iLow(symbol, tf, lowestShiftBetween);
+        // indexOrderInfo.valid = indexOrderInfo.valid && (orderEnv == ENV_SELL ? (price > indexOrderInfo.tpPrice && highestPrice < indexOrderInfo.slPrice) : (price < indexOrderInfo.tpPrice && lowestPrice > indexOrderInfo.slPrice));
+        indexOrderInfo.valid = indexOrderInfo.valid && (orderEnv == ENV_SELL ? (highestPrice < indexOrderInfo.slPrice) : (lowestPrice > indexOrderInfo.slPrice));
+      }
+
+      signals[signalIndexToValidate] = signal;
     }
-  }
-  else
-  {
-    // if index = 0, the first signal is always valid
-    indexOrderInfo.valid = true;
   }
 
   return indexOrderInfo;
-}
-
-OrderInfoResult validateOrderDistanceToCurrentCandle(string symbol, ENUM_TIMEFRAMES tf, OrderEnvironment orderEnv, SignalResult &signal)
-{
-
-  // Find highest/lowest entry price in the past
-  OrderInfoResult entry = signalToOrderInfo(symbol, tf, orderEnv, signal);
-
-  entry.valid = false;
-
-  if (entry.orderPrice > -1)
-  {
-    bool isValidPriceDistance = false;
-    int candlesCountFromMostValidEntry = MathAbs(signal.maChangeShift + 1);
-
-    const double validationHitSize = MathAbs(entry.orderPrice - entry.slPrice) * ValidationTpHitSizeAcsRatio;
-
-    if (orderEnv == ENV_SELL)
-    {
-      double validationHitPrice = entry.orderPrice - validationHitSize;
-      int lowestCandleFromMostValid = iLowest(symbol, tf, MODE_LOW, candlesCountFromMostValidEntry, 0);
-      double lowestPrice = iLow(symbol, tf, lowestCandleFromMostValid);
-      isValidPriceDistance = (lowestPrice > validationHitPrice);
-    }
-    else if (orderEnv == ENV_BUY)
-    {
-      double validationHitPrice = entry.orderPrice + validationHitSize;
-      int highestCandleFromMostValid = iHighest(symbol, tf, MODE_HIGH, candlesCountFromMostValidEntry, 0);
-      double highestPrice = iHigh(symbol, tf, highestCandleFromMostValid);
-      isValidPriceDistance = (highestPrice < validationHitPrice);
-    }
-
-    if (isValidPriceDistance)
-    {
-      entry.pending = true;
-      entry.valid = true;
-    }
-  }
-
-  return entry;
 }
 
 int findMostValidSignalIndex(string symbol, ENUM_TIMEFRAMES tf, OrderEnvironment orderEnv, SignalResult &signals[], int limitIndex = -1)
@@ -1189,13 +1073,13 @@ int findMostValidSignalIndex(string symbol, ENUM_TIMEFRAMES tf, OrderEnvironment
     SignalResult item = signals[i];
     OrderInfoResult signalOrderInfo = signalToOrderInfo(symbol, tf, orderEnv, item);
 
-    if (orderEnv == ENV_SELL && signalOrderInfo.originalPrice > mostValidEntry.originalPrice)
+    if (orderEnv == ENV_SELL && signalOrderInfo.orderPrice > mostValidEntry.orderPrice)
     {
       mostValidEntrySignal = item;
       mostValidEntry = signalOrderInfo;
       place = i;
     }
-    else if (orderEnv == ENV_BUY && signalOrderInfo.originalPrice < mostValidEntry.originalPrice)
+    else if (orderEnv == ENV_BUY && signalOrderInfo.orderPrice < mostValidEntry.orderPrice)
     {
       mostValidEntrySignal = item;
       mostValidEntry = signalOrderInfo;
