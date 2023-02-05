@@ -1147,17 +1147,21 @@ OrderInfoResult validateOrderDistanceToCurrentCandle(string symbol, ENUM_TIMEFRA
     bool isValidPriceDistance = false;
     int candlesCountFromMostValidEntry = MathAbs(signal.maChangeShift + 1);
 
+    const double validationHitSize = MathAbs(entry.orderPrice - entry.slPrice) * ValidationTpHitSizeAcsRatio;
+
     if (orderEnv == ENV_SELL)
     {
+      double validationHitPrice = entry.orderPrice - validationHitSize;
       int lowestCandleFromMostValid = iLowest(symbol, tf, MODE_LOW, candlesCountFromMostValidEntry, 0);
       double lowestPrice = iLow(symbol, tf, lowestCandleFromMostValid);
-      isValidPriceDistance = (lowestPrice > entry.tpPrice);
+      isValidPriceDistance = (lowestPrice > validationHitPrice);
     }
     else if (orderEnv == ENV_BUY)
     {
+      double validationHitPrice = entry.orderPrice + validationHitSize;
       int highestCandleFromMostValid = iHighest(symbol, tf, MODE_HIGH, candlesCountFromMostValidEntry, 0);
       double highestPrice = iHigh(symbol, tf, highestCandleFromMostValid);
-      isValidPriceDistance = (highestPrice < entry.tpPrice);
+      isValidPriceDistance = (highestPrice < validationHitPrice);
     }
 
     if (isValidPriceDistance)
