@@ -100,7 +100,6 @@ void initLibertyMA(double &maBuffer[], string symbol, ENUM_TIMEFRAMES TimeFrame,
 
             ma = iMA(symbol, TimeFrame, PERIOD, 0, Method, AppliedPrice, 0);
 
-
             // Find a valid value for shift2+n if it has empty value
             // To avoid having empty MA values
             if (maBuffer[shift2 + n] == EMPTY_VALUE)
@@ -136,7 +135,9 @@ void initLibertyMA(double &maBuffer[], string symbol, ENUM_TIMEFRAMES TimeFrame,
 
                (MA[n] - MA[current]) * n
             */
-            double diffRatio = 0; // MathAbs(maBuffer[n] - ma); // * n;
+            double prevMa = iMA(symbol, TimeFrame, PERIOD, 0, Method, AppliedPrice, 1);
+
+            double diffRatio = MathAbs(prevMa - ma) / 2; ///(n);
 
             if (maBuffer[n] < ma)
             {
