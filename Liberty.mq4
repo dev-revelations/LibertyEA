@@ -996,6 +996,7 @@ OrderInfoResult validateOrderDistance(string symbol, ENUM_TIMEFRAMES tf, OrderEn
       /**
        *  General rules:
        *  From left side : We check to see if we had a TP hitting move or not
+       *  From Signal Itself: We check to see if we had a TP hitting move or not
        *  From right side : We check if any higher/lower prices happened after the most valid signal (this means there is a currently happening higher/lower candles without a signal)
        */
 
@@ -1037,6 +1038,29 @@ OrderInfoResult validateOrderDistance(string symbol, ENUM_TIMEFRAMES tf, OrderEn
           if (!isValidPriceDistance)
             break;
         }
+      }
+
+      // From Signal Itself:  Checking TP hit
+      if (indexOrderInfo.valid) {
+        const double signalBreakevenSize = MathAbs(indexOrderInfo.orderPrice - indexOrderInfo.slPrice) * ValidationTpHitSizeAcsRatio;
+        bool isValidPriceDistance = true;
+
+        if (orderEnv == ENV_SELL)
+          {
+            int lowestCandleFromShift0 = iLowest(symbol, tf, MODE_LOW, signal.maChangeShift, 0);
+            double lowestPrice = iLow(symbol, tf, lowestCandleFromShift0);
+            double signalEntryBreakevenPrice = indexOrderInfo.orderPrice - signalBreakevenSize;
+            isValidPriceDistance = (indexOrderInfo.originalPrice > signalEntryBreakevenPrice) && (lowestPrice > signalEntryBreakevenPrice);
+          }
+          else if (orderEnv == ENV_BUY)
+          {
+            int highestCandleFromShift0 = iHighest(symbol, tf, MODE_HIGH, signal.maChangeShift, 0);
+            double highestPrice = iHigh(symbol, tf, highestCandleFromShift0);
+            double signalEntryBreakevenPrice = indexOrderInfo.orderPrice + signalBreakevenSize;
+            isValidPriceDistance = (indexOrderInfo.originalPrice < signalEntryBreakevenPrice) && (highestPrice < signalEntryBreakevenPrice);
+          }
+
+          indexOrderInfo.valid = indexOrderInfo.valid && isValidPriceDistance;
       }
 
       // Right Side: We check if from the current candle if we had any lower/higher prices than the current most valid signal
