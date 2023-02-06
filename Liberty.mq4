@@ -42,6 +42,9 @@ extern bool EnableBreakEven = true;                                      // Enab
 extern double BreakEvenRatio = 2.65;                                     // Break Even Ratio
 extern double BreakEvenGapPip = 2;                                       // Break Even Gap Pip
 extern double BuyStopSellStopGapInACS = 0.1;                             // Immediate BuyStop / SellStop Gap in ACS Ratio
+extern string _separator2_1 = "======================================="; // ===== Order Management Settings =====
+extern int CustomPendingExecutionStart = 6;                              // Custom Pending Execution Start
+extern int CustomPendingExecutionEnd = 8;                                // Custom Pending Execution End
 extern string _separator4 = "=======================================";   // ===== Sessions (Min = 0 , Max = 24) =====
 extern int GMTOffset = 2;                                                // GMT Offset
 extern bool EnableTradingSession1 = true;                                // Enable Trading in Session 1
@@ -1034,7 +1037,6 @@ OrderInfoResult validateOrderDistance(string symbol, ENUM_TIMEFRAMES tf, OrderEn
           if (!isValidPriceDistance)
             break;
         }
-
       }
 
       // Right Side: We check if from the current candle if we had any lower/higher prices than the current most valid signal
