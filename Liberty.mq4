@@ -112,7 +112,7 @@ void OnTick()
   if (IsTesting() && TimeHour(TimeCurrent()) < TestSkipToTime)
     return;
 
-  if (!EnableEATimer)
+  if (!EnableEATimer || SingleChart)
   {
     runEA();
   }
@@ -120,7 +120,7 @@ void OnTick()
 //+------------------------------------------------------------------+
 void OnTimer()
 {
-  if (EnableEATimer)
+  if (EnableEATimer && !SingleChart)
   {
     // OnTick();
     runEA();
