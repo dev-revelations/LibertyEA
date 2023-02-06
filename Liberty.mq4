@@ -66,6 +66,7 @@ extern int ActiveSignalForTest = 0;
 extern bool ShowTP_SL = false;                // Show TP & SL Lines
 extern bool ShowLinesForOpenedOrders = false; // Show lines for opened orders
 extern int RefreshEverySeconds = 20;          // Refresh Every X seconds
+extern int TestSkipToTime = -1;               // Skips Test To The Market Hour Defined
 
 //////////////////////////////////////////////////////////////////////////////
 #include <WinUser32.mqh>
@@ -108,6 +109,9 @@ void OnDeinit(const int reason)
 void OnTick()
 {
   //---
+  if (IsTesting() && TimeHour(TimeCurrent()) < TestSkipToTime)
+    return;
+
   if (!EnableEATimer)
   {
     runEA();
@@ -135,18 +139,7 @@ void runEA()
       initializeMAs();
     }
 
-    if (SingleChart)
-    {
-      if (secondsPassed(RefreshEverySeconds, simulationTimer))
-      {
-        simulate(_Symbol, lower_timeframe, 0);
-      }
-      runStrategy1(_Symbol, lower_timeframe, higher_timeframe, 0);
-    }
-    else
-    {
       scanSymbolGroups();
-    }
   }
 
   if (secondsPassed(RefreshEverySeconds, simulationOrderLineTimer))
@@ -188,7 +181,7 @@ void scanSymbolGroups()
       if (canRefreshSimulation)
         simulate(symbol, lower_timeframe, groupIdx);
 
-      if (IsTesting() && _Symbol != symbol)
+      if ((IsTesting() || SingleChart) && _Symbol != symbol)
       {
         continue;
       }
