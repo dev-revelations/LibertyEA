@@ -288,7 +288,11 @@ bool deletePendingIfExceededTPThreshold()
     string symbol = OrderSymbol();
     int OP = OrderType();
     double TP = OrderTakeProfit();
+    double SL = OrderStopLoss();
+    double orderPrice = OrderOpenPrice();
     double ask = MarketInfo(symbol, MODE_ASK);
+
+    const double validationBreakevenSize = MathAbs(orderPrice - SL) * ValidationTpHitSizeAcsRatio;
 
     bool typeSell = OP == OP_SELLLIMIT || OP == OP_SELLSTOP;
     bool typeBuy = OP == OP_BUYLIMIT || OP == OP_BUYSTOP;
@@ -297,11 +301,13 @@ bool deletePendingIfExceededTPThreshold()
 
     if (typeSell)
     {
-        shouldDelete = ask <= TP;
+        double deleteBreakevenPrice = orderPrice - validationBreakevenSize;
+        shouldDelete = ask <= deleteBreakevenPrice;
     }
     else if (typeBuy)
     {
-        shouldDelete = ask >= TP;
+        double deleteBreakevenPrice = orderPrice + validationBreakevenSize;
+        shouldDelete = ask >= deleteBreakevenPrice;
     }
 
     bool couldDelete = false;
