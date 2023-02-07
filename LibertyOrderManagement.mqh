@@ -1,6 +1,11 @@
 /////////////////////////// Order Management Helpers ///////////////////////////
 void processOrders()
 {
+    if (!Enabled)
+    {
+        return;
+    }
+
     int total = OrdersTotal();
     for (int pos = 0; pos < total; pos++)
     {
