@@ -14,7 +14,7 @@ extern int EATimerSconds = 1;                                            // EA T
 extern bool CheckSignalsOnNewCandle = true;                              // Check for signals on new candle openning
 extern string _separator1_2 = "======================================="; // ===== Average Candle Size Settings =====
 extern int AverageCandleSizePeriod = 40;
-extern double PendingThresholdAverageCandleSizeRatio = 2.25;             // PendinCustomPendingThresholdAverageCandleSizeRatiog Threshold In Average Candle Size Ratio
+extern double PendingThresholdAverageCandleSizeRatio = 2.25;             // Pending Threshold In Average Candle Size Ratio
 extern int CustomACSTimeStart = 0;                                       // Custom Pending ACS Start
 extern int CustomACSTimeEnd = 7;                                         // Custom Pending ACS End
 extern double CustomPendingThresholdAverageCandleSizeRatio = 3.75;       // Custom Time Pending Threshold In Average Candle Size Ratio
@@ -35,6 +35,7 @@ extern int MagicNumber = 1111;
 extern double RiskPercent = 1;
 extern double TakeProfitRatio = 3;
 extern double StopLossGapInAverageCandleSize = 0.2;
+extern double StopLossGapInSpreadRatio = 0.5; // Stoploss Gap With a Ratio of Spread
 // extern double StoplossGapInPip = 2;
 extern int PendingsExpirationMinutes = 10000;
 extern string CommentText = "";
@@ -372,7 +373,7 @@ OrderInfoResult getSymbolEntry(string symbol, ENUM_TIMEFRAMES currentTF, int fir
     SignalResult lastSignal = signals[lastSignalIndex];
     // Validate Signal
 
-    OrderInfoResult orderCalculated = validateOrderDistance(symbol, currentTF, maCross.orderEnvironment, firstAreaTouchShift, signals, lastSignalIndex);
+    OrderInfoResult orderCalculated = validateOrderDistance(symbol, currentTF, maCross.orderEnvironment, firstAreaTouchShift, signals, lastSignalIndex, true);
 
     // If last signal is hapenning now
     if (lastSignal.maChangeShift >= 0 && lastSignal.maChangeShift <= ImmediateEntryRange && orderCalculated.valid)
@@ -382,13 +383,13 @@ OrderInfoResult getSymbolEntry(string symbol, ENUM_TIMEFRAMES currentTF, int fir
       {
         if (maCross.orderEnvironment == ENV_SELL)
         {
-          orderCalculated = calculeOrderPlace(symbol, currentTF, maCross.orderEnvironment, 0, lastSignal.highestShift, MarketInfo(symbol, MODE_BID), false);
+          orderCalculated = calculeOrderPlace(symbol, currentTF, maCross.orderEnvironment, 0, lastSignal.highestShift, MarketInfo(symbol, MODE_BID), false, true);
           // orderCalculated.orderPrice = ;
         }
         else if (maCross.orderEnvironment == ENV_BUY)
         {
           // orderCalculated.orderPrice = MarketInfo(symbol, MODE_ASK);
-          orderCalculated = calculeOrderPlace(symbol, currentTF, maCross.orderEnvironment, 0, lastSignal.lowestShift, MarketInfo(symbol, MODE_ASK), false);
+          orderCalculated = calculeOrderPlace(symbol, currentTF, maCross.orderEnvironment, 0, lastSignal.lowestShift, MarketInfo(symbol, MODE_ASK), false, true);
         }
         orderCalculated.pending = false;
       }
@@ -400,7 +401,7 @@ OrderInfoResult getSymbolEntry(string symbol, ENUM_TIMEFRAMES currentTF, int fir
     {
       // if last signal is not hapenning now, find the latest valid signal and set a pending order for it
       int latestValidSignalIndex = findMostValidSignalIndex(symbol, currentTF, maCross.orderEnvironment, signals);
-      OrderInfoResult latestValidOrder = validateOrderDistance(symbol, currentTF, maCross.orderEnvironment, firstAreaTouchShift, signals, latestValidSignalIndex);
+      OrderInfoResult latestValidOrder = validateOrderDistance(symbol, currentTF, maCross.orderEnvironment, firstAreaTouchShift, signals, latestValidSignalIndex, true);
       latestValidOrder.valid = latestValidOrder.valid && (maCross.orderEnvironment == ENV_SELL ? (price > latestValidOrder.tpPrice) : (price < latestValidOrder.tpPrice));
       latestValidOrder.pending = true;
       result = latestValidOrder;
@@ -861,7 +862,7 @@ void listSignals(SignalResult &list[], string symbol, ENUM_TIMEFRAMES lowTF, Ord
   }
 }
 
-OrderInfoResult calculeOrderPlace(string symbol, ENUM_TIMEFRAMES tf, OrderEnvironment orderEnv, int signalShift, int highestLowestShift, double price, bool withPending = true)
+OrderInfoResult calculeOrderPlace(string symbol, ENUM_TIMEFRAMES tf, OrderEnvironment orderEnv, int signalShift, int highestLowestShift, double price, bool withPending = true, bool withSpread = false)
 {
   OrderInfoResult orderInfo;
 
@@ -884,11 +885,18 @@ OrderInfoResult calculeOrderPlace(string symbol, ENUM_TIMEFRAMES tf, OrderEnviro
 
   double marketAsk = SymbolInfoDouble(symbol, SYMBOL_ASK);
   double marketBid = SymbolInfoDouble(symbol, SYMBOL_BID);
+  const double marketSpread = MathAbs(marketAsk - marketBid);
+  const double slSpreadGap = marketSpread * StopLossGapInSpreadRatio;
 
   if (orderEnv == ENV_SELL)
   {
     orderInfo.absoluteSlPrice = highestLowestPrice;
     orderInfo.slPrice = highestLowestPrice + gapSizeInPoint;
+
+    if (withSpread)
+    {
+      orderInfo.slPrice += slSpreadGap;
+    }
 
     double stopLossToScaledCandleSize = orderInfo.slPrice - scaledCandleSize;
     orderInfo.pending = (price < stopLossToScaledCandleSize) && withPending;
@@ -909,6 +917,11 @@ OrderInfoResult calculeOrderPlace(string symbol, ENUM_TIMEFRAMES tf, OrderEnviro
     orderInfo.absoluteSlPrice = highestLowestPrice;
     orderInfo.slPrice = highestLowestPrice - gapSizeInPoint;
 
+    if (withSpread)
+    {
+      orderInfo.slPrice -= slSpreadGap;
+    }
+
     double stopLossToScaledCandleSize = orderInfo.slPrice + scaledCandleSize;
     orderInfo.pending = (price > stopLossToScaledCandleSize) && withPending;
 
@@ -927,32 +940,32 @@ OrderInfoResult calculeOrderPlace(string symbol, ENUM_TIMEFRAMES tf, OrderEnviro
   return orderInfo;
 }
 
-OrderInfoResult signalToOrderInfo(string symbol, ENUM_TIMEFRAMES tf, OrderEnvironment orderEnv, SignalResult &signal, bool useVirtualPrice = true)
+OrderInfoResult signalToOrderInfo(string symbol, ENUM_TIMEFRAMES tf, OrderEnvironment orderEnv, SignalResult &signal, bool useVirtualPrice = true, bool withSpread = false)
 {
   OrderInfoResult orderCalculated;
   if (orderEnv == ENV_SELL && signal.highestShift > -1)
   {
     double low = MathMin(iOpen(symbol, tf, signal.maChangeShift), iClose(symbol, tf, signal.maChangeShift)); // iLow(symbol, tf, signal.maChangeShift)
     double price = useVirtualPrice ? low : MarketInfo(symbol, MODE_BID);
-    orderCalculated = calculeOrderPlace(symbol, tf, orderEnv, signal.maChangeShift, signal.highestShift, price);
+    orderCalculated = calculeOrderPlace(symbol, tf, orderEnv, signal.maChangeShift, signal.highestShift, price, true, withSpread);
   }
   else if (orderEnv == ENV_BUY && signal.lowestShift > -1)
   {
     double high = MathMax(iOpen(symbol, tf, signal.maChangeShift), iClose(symbol, tf, signal.maChangeShift)); // iHigh(symbol, tf, signal.maChangeShift)
     double price = useVirtualPrice ? high : MarketInfo(symbol, MODE_ASK);
-    orderCalculated = calculeOrderPlace(symbol, tf, orderEnv, signal.maChangeShift, signal.lowestShift, price);
+    orderCalculated = calculeOrderPlace(symbol, tf, orderEnv, signal.maChangeShift, signal.lowestShift, price, true, withSpread);
   }
   return orderCalculated;
 }
 
-OrderInfoResult validateOrderDistance(string symbol, ENUM_TIMEFRAMES tf, OrderEnvironment orderEnv, int firstAreaTouchShift, SignalResult &signals[], int signalIndexToValidate)
+OrderInfoResult validateOrderDistance(string symbol, ENUM_TIMEFRAMES tf, OrderEnvironment orderEnv, int firstAreaTouchShift, SignalResult &signals[], int signalIndexToValidate, bool withSpread)
 {
 
   int signalsCount = ArraySize(signals);
 
   SignalResult signal = signals[signalIndexToValidate];
 
-  OrderInfoResult indexOrderInfo = signalToOrderInfo(symbol, tf, orderEnv, signal);
+  OrderInfoResult indexOrderInfo = signalToOrderInfo(symbol, tf, orderEnv, signal, true, withSpread);
 
   indexOrderInfo.valid = false;
 
@@ -961,7 +974,7 @@ OrderInfoResult validateOrderDistance(string symbol, ENUM_TIMEFRAMES tf, OrderEn
     // Find highest/lowest entry price in the past
     int mostValidIndex = findMostValidSignalIndex(symbol, tf, orderEnv, signals, signalIndexToValidate);
     SignalResult mostValidEntrySignal = signals[mostValidIndex];
-    OrderInfoResult mostValidEntry = signalToOrderInfo(symbol, tf, orderEnv, mostValidEntrySignal);
+    OrderInfoResult mostValidEntry = signalToOrderInfo(symbol, tf, orderEnv, mostValidEntrySignal, true, withSpread);
 
     if (signalIndexToValidate == mostValidIndex && signal.maChangeShift != firstAreaTouchShift)
     {
@@ -983,7 +996,7 @@ OrderInfoResult validateOrderDistance(string symbol, ENUM_TIMEFRAMES tf, OrderEn
         signal.lowestShift = lowestFromFirstTouch;
       }
 
-      indexOrderInfo = signalToOrderInfo(symbol, tf, orderEnv, signal);
+      indexOrderInfo = signalToOrderInfo(symbol, tf, orderEnv, signal, true, withSpread);
       indexOrderInfo.valid = true;
       signal.valid = true;
 
