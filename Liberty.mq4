@@ -1029,6 +1029,12 @@ OrderInfoResult validateOrderDistance(string symbol, ENUM_TIMEFRAMES tf, OrderEn
             double lowestPrice = iLow(symbol, tf, lowestCandleFromMostValid);
             double mostValidEntryBreakevenPrice = mostValidEntry.orderPrice - mostValidBreakevenSize;
             isValidPriceDistance = (indexOrderInfo.originalPrice > mostValidEntryBreakevenPrice) && (lowestPrice > mostValidEntryBreakevenPrice);
+
+            // This means TP hit was with signal candle itself and it was a very big candle
+            if (lowestCandleFromMostValid == mostValidEntrySignal.maChangeShift)
+            {
+              isValidPriceDistance = true;
+            }
           }
           else if (orderEnv == ENV_BUY)
           {
@@ -1036,6 +1042,12 @@ OrderInfoResult validateOrderDistance(string symbol, ENUM_TIMEFRAMES tf, OrderEn
             double highestPrice = iHigh(symbol, tf, highestCandleFromMostValid);
             double mostValidEntryBreakevenPrice = mostValidEntry.orderPrice + mostValidBreakevenSize;
             isValidPriceDistance = (indexOrderInfo.originalPrice < mostValidEntryBreakevenPrice) && (highestPrice < mostValidEntryBreakevenPrice);
+
+            // This means TP hit was with signal candle itself and it was a very big candle
+            if (highestCandleFromMostValid == mostValidEntrySignal.maChangeShift)
+            {
+              isValidPriceDistance = true;
+            }
           }
 
           indexOrderInfo.valid = indexOrderInfo.valid && isValidPriceDistance;
@@ -1046,7 +1058,8 @@ OrderInfoResult validateOrderDistance(string symbol, ENUM_TIMEFRAMES tf, OrderEn
             break;
         }
 
-        // Print("Validation 1 = ", indexOrderInfo.valid ? "Valid" : "Invalid");
+        // if (symbol == "CADCHF" && signalIndexToValidate == 0)
+        //   Print("Validation 1 = ", indexOrderInfo.valid ? "Valid" : "Invalid");
       }
 
       // From Signal Itself:  Checking TP hit
@@ -1072,12 +1085,14 @@ OrderInfoResult validateOrderDistance(string symbol, ENUM_TIMEFRAMES tf, OrderEn
 
         indexOrderInfo.valid = indexOrderInfo.valid && isValidPriceDistance;
 
-        // Print("Validation 2 = ", indexOrderInfo.valid ? "Valid" : "Invalid");
+        // if (symbol == "CADCHF" && signalIndexToValidate == 0)
+        //   Print("Validation 2 = ", indexOrderInfo.valid ? "Valid" : "Invalid");
       }
 
       // Right Side: We check if from the current candle if we had any lower/higher prices than the current most valid signal
       // If we find one, then the current most valid is not really valid and we shod invalid it and wait for a
       // new signal to happen
+
       if (indexOrderInfo.valid && signal.maChangeShift > 1) /* That's very important that the signal shift to be more than 1*/
       {
         double price = orderEnv == ENV_SELL ? MarketInfo(symbol, MODE_BID) : MarketInfo(symbol, MODE_ASK);
@@ -1085,10 +1100,22 @@ OrderInfoResult validateOrderDistance(string symbol, ENUM_TIMEFRAMES tf, OrderEn
         double highestPrice = iHigh(symbol, tf, highestShiftBetween);
         int lowestShiftBetween = iLowest(symbol, tf, MODE_LOW, signal.maChangeShift - 1, 0);
         double lowestPrice = iLow(symbol, tf, lowestShiftBetween);
-        // indexOrderInfo.valid = indexOrderInfo.valid && (orderEnv == ENV_SELL ? (price > indexOrderInfo.tpPrice && highestPrice < indexOrderInfo.slPrice) : (price < indexOrderInfo.tpPrice && lowestPrice > indexOrderInfo.slPrice));
-        indexOrderInfo.valid = indexOrderInfo.valid && (orderEnv == ENV_SELL ? (highestPrice < indexOrderInfo.slPrice) : (lowestPrice > indexOrderInfo.slPrice));
 
-        // Print("Validation 3 = ", indexOrderInfo.valid ? "Valid" : "Invalid ", signal.maChangeShift);
+        if (orderEnv == ENV_SELL)
+        {
+          double signalHighestPrice = iHigh(symbol, tf, signal.highestShift);
+          indexOrderInfo.valid = indexOrderInfo.valid && (highestPrice < signalHighestPrice);
+        }
+        else if (orderEnv == ENV_BUY)
+        {
+          double signalLowestPrice = iLow(symbol, tf, signal.lowestShift);
+          indexOrderInfo.valid = indexOrderInfo.valid && (lowestPrice > signalLowestPrice);
+        }
+
+        // indexOrderInfo.valid = indexOrderInfo.valid && (orderEnv == ENV_SELL ? (price > indexOrderInfo.tpPrice && highestPrice < indexOrderInfo.slPrice) : (price < indexOrderInfo.tpPrice && lowestPrice > indexOrderInfo.slPrice));
+
+        // if (symbol == "AUDNZD" && signalIndexToValidate == 0)
+        //   Print("Validation 3 = ", indexOrderInfo.valid ? "Valid " : "Invalid ", signal.maChangeShift);
       }
 
       signals[signalIndexToValidate] = signal;
