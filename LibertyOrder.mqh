@@ -19,7 +19,7 @@ double GetLotSize(string symbol, double riskPercent, double price, double slPric
     double lotstep = SymbolInfoDouble(symbol, SYMBOL_VOLUME_STEP);
 
     double moneyPerLotstep = slPoints / ticksize * tickvalue * lotstep;
-    double lots = MathFloor(risk / moneyPerLotstep) * lotstep;
+    double lots = risk > 0 && moneyPerLotstep > 0 ? MathFloor(risk / moneyPerLotstep) * lotstep : 0;
 
     lots = MathMin(lots, SymbolInfoDouble(symbol, SYMBOL_VOLUME_MAX));
     lots = MathMax(lots, SymbolInfoDouble(symbol, SYMBOL_VOLUME_MIN));
