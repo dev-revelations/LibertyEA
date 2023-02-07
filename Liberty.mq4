@@ -8,6 +8,7 @@
 #property version "1.11"
 #property strict
 
+extern bool Enabled = true;
 extern bool SingleChart = false;                                         // Single Chart Scan
 extern bool EnableEATimer = true;                                        // Enable EA Timer
 extern int EATimerSconds = 1;                                            // EA Timer Interval Seconds
@@ -70,6 +71,7 @@ extern bool ShowLinesForOpenedOrders = false; // Show lines for opened orders
 extern int RefreshEverySeconds = 20;          // Refresh Every X seconds
 extern int TestSkipToTime = -1;               // Skips Test To The Market Hour Defined
 
+const int accountLogin = 44572110;
 //////////////////////////////////////////////////////////////////////////////
 #include <WinUser32.mqh>
 #include "Liberty.mqh"
@@ -85,6 +87,12 @@ extern int TestSkipToTime = -1;               // Skips Test To The Market Hour D
 int OnInit()
 {
   //---
+  if (AccountInfoInteger(ACCOUNT_LOGIN) != accountLogin)
+  {
+    Alert("EA Deactivated! Login Mismatched");
+    return (INIT_FAILED);
+  }
+
   if (EnableEATimer)
   {
     EventSetTimer(EATimerSconds);
@@ -131,6 +139,11 @@ void OnTimer()
 
 void runEA()
 {
+  if (AccountInfoInteger(ACCOUNT_LOGIN) != accountLogin)
+  {
+    return;
+  }
+
   processOrders();
 
   if (IsTradeAllowed())
@@ -312,7 +325,7 @@ StrategyResult runStrategy1(string symbol, ENUM_TIMEFRAMES lowTF, ENUM_TIMEFRAME
 
     bool isTimeAllowed = TimeFilter(SessionStart1, SessionEnd1) || TimeFilter(SessionStart2, SessionEnd2) || TimeFilter(SessionStart3, SessionEnd3);
 
-    if (isTimeAllowed && isTradingEnabledInCurrentSession())
+    if (isTimeAllowed && isTradingEnabledInCurrentSession() && Enabled)
     {
 
       int firstAreaTouchShift = findAreaTouch(symbol, highTF, maCross.orderEnvironment, maCross.crossCandleShift, lowTF);
