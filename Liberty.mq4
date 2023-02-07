@@ -25,7 +25,7 @@ extern string _separator1 = "=======================================";   // ====
 extern ENUM_TIMEFRAMES higher_timeframe = PERIOD_H4;                     // Higher Timeframe
 extern int MA_Closing_Delay = 2;                                         // Number of higher TF candles should wait
 extern double MA_Touch_Thickness_Ratio = 0.2;                            // Higher MA Touch Thickness Ratio in Average Candle Size
-extern double MA_Crossing_Opening_Ratio = 0.5;                           // MA Cross Openning Size Ratio in Average Candle Size
+extern double MA_Crossing_Opening_Ratio = 0.25;                          // MA Cross Openning Size Ratio in Average Candle Size
 extern double MA_Crossing_Opening_Ratio_Env_Change = 0.2;                // MA Cross Openning Size Ratio For Environment Change in ACS
 extern string _separator1_1 = "======================================="; // ===== Lower Timeframe =====
 extern ENUM_TIMEFRAMES lower_timeframe = PERIOD_M5;                      // Lower Timeframe (Never select current)
@@ -42,6 +42,7 @@ extern bool EnableBreakEven = true;                                      // Enab
 extern double BreakEvenRatio = 2.65;                                     // Break Even Ratio
 extern double BreakEvenGapPip = 2;                                       // Break Even Gap Pip
 extern double BuyStopSellStopGapInACS = 0.1;                             // Immediate BuyStop / SellStop Gap in ACS Ratio
+extern int ImmediateEntryRange = 0;                                      // Immediate Order Entry Range Candles
 extern string _separator2_1 = "======================================="; // ===== Order Management Settings =====
 extern int CustomPendingExecutionStart = 0;                              // Custom Pending Execution Start
 extern int CustomPendingExecutionEnd = 7;                                // Custom Pending Execution End
@@ -139,7 +140,7 @@ void runEA()
       initializeMAs();
     }
 
-      scanSymbolGroups();
+    scanSymbolGroups();
   }
 
   if (secondsPassed(RefreshEverySeconds, simulationOrderLineTimer))
@@ -321,11 +322,12 @@ StrategyResult runStrategy1(string symbol, ENUM_TIMEFRAMES lowTF, ENUM_TIMEFRAME
         listSignals(signals, symbol, lowTF, maCross.orderEnvironment, firstAreaTouchShift);
 
         int signalsCount = ArraySize(signals);
+        // Print("Signals Count = ", signalsCount);
         if (signalsCount > 0)
         {
 
           OrderInfoResult entry = getSymbolEntry(symbol, lowTF, firstAreaTouchShift, maCross, signals);
-
+          // Print("Is Entry Valid ? ", entry.valid ? "Yes" : "No");
           // Preparing the strategy result
           if (maCross.orderEnvironment == ENV_SELL)
           {
@@ -372,10 +374,8 @@ OrderInfoResult getSymbolEntry(string symbol, ENUM_TIMEFRAMES currentTF, int fir
 
     OrderInfoResult orderCalculated = validateOrderDistance(symbol, currentTF, maCross.orderEnvironment, firstAreaTouchShift, signals, lastSignalIndex);
 
-    const int immediateRange = 2;
-
     // If last signal is hapenning now
-    if (lastSignal.maChangeShift >= 0 && lastSignal.maChangeShift <= immediateRange && orderCalculated.valid)
+    if (lastSignal.maChangeShift >= 0 && lastSignal.maChangeShift <= ImmediateEntryRange && orderCalculated.valid)
     {
       // open signal
       if (!orderCalculated.pending)
@@ -393,9 +393,10 @@ OrderInfoResult getSymbolEntry(string symbol, ENUM_TIMEFRAMES currentTF, int fir
         orderCalculated.pending = false;
       }
 
+      orderCalculated.valid = true;
       result = orderCalculated;
     }
-    else if (lastSignal.maChangeShift > immediateRange)
+    else if (lastSignal.maChangeShift > ImmediateEntryRange)
     {
       // if last signal is not hapenning now, find the latest valid signal and set a pending order for it
       int latestValidSignalIndex = findMostValidSignalIndex(symbol, currentTF, maCross.orderEnvironment, signals);
@@ -1031,35 +1032,40 @@ OrderInfoResult validateOrderDistance(string symbol, ENUM_TIMEFRAMES tf, OrderEn
           if (!isValidPriceDistance)
             break;
         }
+
+        // Print("Validation 1 = ", indexOrderInfo.valid ? "Valid" : "Invalid");
       }
 
       // From Signal Itself:  Checking TP hit
-      if (indexOrderInfo.valid) {
+      if (indexOrderInfo.valid)
+      {
         const double signalBreakevenSize = MathAbs(indexOrderInfo.orderPrice - indexOrderInfo.slPrice) * ValidationTpHitSizeAcsRatio;
         bool isValidPriceDistance = true;
 
         if (orderEnv == ENV_SELL)
-          {
-            int lowestCandleFromShift0 = iLowest(symbol, tf, MODE_LOW, signal.maChangeShift, 0);
-            double lowestPrice = iLow(symbol, tf, lowestCandleFromShift0);
-            double signalEntryBreakevenPrice = indexOrderInfo.orderPrice - signalBreakevenSize;
-            isValidPriceDistance = (indexOrderInfo.originalPrice > signalEntryBreakevenPrice) && (lowestPrice > signalEntryBreakevenPrice);
-          }
-          else if (orderEnv == ENV_BUY)
-          {
-            int highestCandleFromShift0 = iHighest(symbol, tf, MODE_HIGH, signal.maChangeShift, 0);
-            double highestPrice = iHigh(symbol, tf, highestCandleFromShift0);
-            double signalEntryBreakevenPrice = indexOrderInfo.orderPrice + signalBreakevenSize;
-            isValidPriceDistance = (indexOrderInfo.originalPrice < signalEntryBreakevenPrice) && (highestPrice < signalEntryBreakevenPrice);
-          }
+        {
+          int lowestCandleFromShift0 = iLowest(symbol, tf, MODE_LOW, signal.maChangeShift, 0);
+          double lowestPrice = iLow(symbol, tf, lowestCandleFromShift0);
+          double signalEntryBreakevenPrice = indexOrderInfo.orderPrice - signalBreakevenSize;
+          isValidPriceDistance = (indexOrderInfo.originalPrice > signalEntryBreakevenPrice) && (lowestPrice > signalEntryBreakevenPrice);
+        }
+        else if (orderEnv == ENV_BUY)
+        {
+          int highestCandleFromShift0 = iHighest(symbol, tf, MODE_HIGH, signal.maChangeShift, 0);
+          double highestPrice = iHigh(symbol, tf, highestCandleFromShift0);
+          double signalEntryBreakevenPrice = indexOrderInfo.orderPrice + signalBreakevenSize;
+          isValidPriceDistance = (indexOrderInfo.originalPrice < signalEntryBreakevenPrice) && (highestPrice < signalEntryBreakevenPrice);
+        }
 
-          indexOrderInfo.valid = indexOrderInfo.valid && isValidPriceDistance;
+        indexOrderInfo.valid = indexOrderInfo.valid && isValidPriceDistance;
+
+        // Print("Validation 2 = ", indexOrderInfo.valid ? "Valid" : "Invalid");
       }
 
       // Right Side: We check if from the current candle if we had any lower/higher prices than the current most valid signal
       // If we find one, then the current most valid is not really valid and we shod invalid it and wait for a
       // new signal to happen
-      if (indexOrderInfo.valid)
+      if (indexOrderInfo.valid && signal.maChangeShift > 1) /* That's very important that the signal shift to be more than 1*/
       {
         double price = orderEnv == ENV_SELL ? MarketInfo(symbol, MODE_BID) : MarketInfo(symbol, MODE_ASK);
         int highestShiftBetween = iHighest(symbol, tf, MODE_HIGH, signal.maChangeShift - 1, 0);
@@ -1068,6 +1074,8 @@ OrderInfoResult validateOrderDistance(string symbol, ENUM_TIMEFRAMES tf, OrderEn
         double lowestPrice = iLow(symbol, tf, lowestShiftBetween);
         // indexOrderInfo.valid = indexOrderInfo.valid && (orderEnv == ENV_SELL ? (price > indexOrderInfo.tpPrice && highestPrice < indexOrderInfo.slPrice) : (price < indexOrderInfo.tpPrice && lowestPrice > indexOrderInfo.slPrice));
         indexOrderInfo.valid = indexOrderInfo.valid && (orderEnv == ENV_SELL ? (highestPrice < indexOrderInfo.slPrice) : (lowestPrice > indexOrderInfo.slPrice));
+
+        // Print("Validation 3 = ", indexOrderInfo.valid ? "Valid" : "Invalid ", signal.maChangeShift);
       }
 
       signals[signalIndexToValidate] = signal;
