@@ -228,7 +228,7 @@ bool customPendingExecution()
     double ask = MarketInfo(symbol, MODE_ASK);
     double bid = MarketInfo(symbol, MODE_BID);
 
-    double price;
+    double price = orderPrice;
 
     bool typeSell = OP == OP_SELLLIMIT; //|| OP == OP_SELLSTOP;
     bool typeBuy = OP == OP_BUYLIMIT;   //|| OP == OP_BUYSTOP;
