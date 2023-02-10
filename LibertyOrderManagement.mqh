@@ -28,8 +28,8 @@ void processOrders()
         if (deleteOrderIfEnvironmentChanged())
             continue;
 
-        if (deleteAllNotBelongsToEA())
-            continue;
+        // if (deleteAllNotBelongsToEA())
+        //     continue;
 
         if (EnableBreakEven)
         {
@@ -112,6 +112,41 @@ bool symbolHasProfitInCurrentCrossing(string symbol, int groupIndex, int crossTi
                     {
                         return true;
                     }
+                }
+            }
+        }
+    }
+
+    return false;
+}
+
+bool groupHasLossInCurrentSession(int groupIndex, OrderEnvironment env)
+{
+    int i, hstTotal = OrdersHistoryTotal();
+
+    int OP = env == ENV_BUY ? OP_BUY : OP_SELL;
+
+    for (i = 0; i < hstTotal; i++)
+    {
+        //---- check selection result
+        if (OrderSelect(i, SELECT_BY_POS, MODE_HISTORY) == false)
+        {
+            continue;
+        }
+
+        if (OrderType() == OP && OrderMagicNumber() == getMagicNumber(groupIndex))
+        {
+            bool hadLoss = OrderProfit() < 0; // OrderClosePrice() >= OrderTakeProfit();
+            if (hadLoss)
+            {
+                // Sessione jadid baraye symbole loss dar
+                // bar asase crossinge jadid khahad bud
+                int orderSession = getSessionNumber(OrderOpenTime());
+                int currentSession = getSessionNumber(TimeCurrent());
+
+                if (sessionsEqual(orderSession, currentSession))
+                {
+                    return true;
                 }
             }
         }
@@ -381,7 +416,7 @@ bool deleteAllNotBelongsToEA()
 
     string symbol = OrderSymbol();
 
-    if (OrderMagicNumber() != getMagicNumber(groupIndex))
+    if (getSessionNumber(TimeCurrent()) > -1 && OrderMagicNumber() != getMagicNumber(groupIndex))
     {
 
         int OP = OrderType();

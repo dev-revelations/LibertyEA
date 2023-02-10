@@ -340,7 +340,7 @@ StrategyResult runStrategy1(string symbol, ENUM_TIMEFRAMES lowTF, ENUM_TIMEFRAME
         if (signalsCount > 0)
         {
 
-          OrderInfoResult entry = getSymbolEntry(symbol, lowTF, firstAreaTouchShift, maCross, signals);
+          OrderInfoResult entry = getSymbolEntry(symbol, lowTF, firstAreaTouchShift, maCross, signals, groupIndex);
           // Print("Is Entry Valid ? ", entry.valid ? "Yes" : "No");
           // Preparing the strategy result
           if (maCross.orderEnvironment == ENV_SELL)
@@ -373,7 +373,7 @@ StrategyResult runStrategy1(string symbol, ENUM_TIMEFRAMES lowTF, ENUM_TIMEFRAME
 /// @param maCross
 /// @param signals
 /// @return The order that we can place for the given symbol. If no order found it will return an invalid order.
-OrderInfoResult getSymbolEntry(string symbol, ENUM_TIMEFRAMES currentTF, int firstAreaTouchShift, HigherTFCrossCheckResult &maCross, SignalResult &signals[])
+OrderInfoResult getSymbolEntry(string symbol, ENUM_TIMEFRAMES currentTF, int firstAreaTouchShift, HigherTFCrossCheckResult &maCross, SignalResult &signals[], int groupIndex)
 {
   OrderInfoResult result;
 
@@ -412,13 +412,17 @@ OrderInfoResult getSymbolEntry(string symbol, ENUM_TIMEFRAMES currentTF, int fir
     }
     else if (lastSignal.maChangeShift > ImmediateEntryRange)
     {
-      // if last signal is not hapenning now, find the latest valid signal and set a pending order for it
-      int latestValidSignalIndex = findMostValidSignalIndex(symbol, currentTF, maCross.orderEnvironment, signals);
-      OrderInfoResult latestValidOrder = validateOrderDistance(symbol, currentTF, maCross.orderEnvironment, firstAreaTouchShift, signals, latestValidSignalIndex, true);
-      latestValidOrder.valid = latestValidOrder.valid && (maCross.orderEnvironment == ENV_SELL ? (price > latestValidOrder.tpPrice) : (price < latestValidOrder.tpPrice));
-      latestValidOrder.pending = true;
-      result = latestValidOrder;
-      // drawVLine(findSymbolChart(symbol), latestValidSignal.maChangeShift, "sdfdsf", C'255,210,7');
+      bool groupHadLass = groupHasLossInCurrentSession(groupIndex, maCross.orderEnvironment);
+      if (groupHadLass == false)
+      {
+        // if last signal is not hapenning now, find the latest valid signal and set a pending order for it
+        int latestValidSignalIndex = findMostValidSignalIndex(symbol, currentTF, maCross.orderEnvironment, signals);
+        OrderInfoResult latestValidOrder = validateOrderDistance(symbol, currentTF, maCross.orderEnvironment, firstAreaTouchShift, signals, latestValidSignalIndex, true);
+        latestValidOrder.valid = latestValidOrder.valid && (maCross.orderEnvironment == ENV_SELL ? (price > latestValidOrder.tpPrice) : (price < latestValidOrder.tpPrice));
+        latestValidOrder.pending = true;
+        result = latestValidOrder;
+        // drawVLine(findSymbolChart(symbol), latestValidSignal.maChangeShift, "sdfdsf", C'255,210,7');
+      }
     }
   }
 
