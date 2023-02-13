@@ -1,11 +1,23 @@
 /////////////////////////// Order Management Helpers ///////////////////////////
 void processOrders()
 {
+    if (!Enabled)
+    {
+        return;
+    }
+
     int total = OrdersTotal();
     for (int pos = 0; pos < total; pos++)
     {
         if (OrderSelect(pos, SELECT_BY_POS) == false)
             continue;
+
+        if (TimeFilter(CustomPendingExecutionStart, CustomPendingExecutionEnd))
+        {
+            if (customPendingExecution())
+                continue;
+            ;
+        }
 
         if (deletePendingIfExceededTPThreshold())
             continue;
@@ -209,12 +221,83 @@ void checkForBreakEven(string symbol, int orderIndex)
     }
 }
 
+bool customPendingExecution()
+{
+    string symbol = OrderSymbol();
+    int OP = OrderType();
+    double TP = OrderTakeProfit();
+    double SL = OrderStopLoss();
+    double orderPrice = OrderOpenPrice();
+    double LotSize = OrderLots();
+    int magicNumber = OrderMagicNumber();
+    double ask = MarketInfo(symbol, MODE_ASK);
+    double bid = MarketInfo(symbol, MODE_BID);
+
+    double price = orderPrice;
+
+    bool typeSell = OP == OP_SELLLIMIT; //|| OP == OP_SELLSTOP;
+    bool typeBuy = OP == OP_BUYLIMIT;   //|| OP == OP_BUYSTOP;
+
+    bool shouldDelete = false;
+
+    if (typeSell)
+    {
+        shouldDelete = ask >= orderPrice;
+        OP = OP_SELL;
+        price = bid;
+    }
+    else if (typeBuy)
+    {
+        shouldDelete = bid <= orderPrice;
+        OP = OP_BUY;
+        price = ask;
+    }
+
+    if (shouldDelete)
+    {
+        int result = OrderSend(
+            symbol,
+            OP,
+            LotSize,
+            price,
+            3,
+            SL,
+            TP,
+            "Custom Pending Executed",
+            magicNumber,
+            0,
+            Green);
+        if (result > -1)
+        {
+            debug("Custom Pending Execution: Opened Immediate Order For " + symbol);
+
+            bool couldDelete = OrderDelete(OrderTicket(), clrAzure);
+            if (couldDelete)
+                debug("Custom Pending Execution: Deleted Pending For " + symbol);
+            else
+                debug("Custom Pending Execution: Deleting Pending **Failed** For " + symbol);
+
+            return true;
+        }
+        else
+        {
+            debug("Custom Pending Execution: **Failed**" + symbol);
+        }
+    }
+
+    return false;
+}
+
 bool deletePendingIfExceededTPThreshold()
 {
     string symbol = OrderSymbol();
     int OP = OrderType();
     double TP = OrderTakeProfit();
+    double SL = OrderStopLoss();
+    double orderPrice = OrderOpenPrice();
     double ask = MarketInfo(symbol, MODE_ASK);
+
+    const double validationBreakevenSize = MathAbs(orderPrice - SL) * ValidationTpHitSizeAcsRatio;
 
     bool typeSell = OP == OP_SELLLIMIT || OP == OP_SELLSTOP;
     bool typeBuy = OP == OP_BUYLIMIT || OP == OP_BUYSTOP;
@@ -223,11 +306,13 @@ bool deletePendingIfExceededTPThreshold()
 
     if (typeSell)
     {
-        shouldDelete = ask <= TP;
+        double deleteBreakevenPrice = orderPrice - validationBreakevenSize;
+        shouldDelete = ask <= deleteBreakevenPrice;
     }
     else if (typeBuy)
     {
-        shouldDelete = ask >= TP;
+        double deleteBreakevenPrice = orderPrice + validationBreakevenSize;
+        shouldDelete = ask >= deleteBreakevenPrice;
     }
 
     bool couldDelete = false;

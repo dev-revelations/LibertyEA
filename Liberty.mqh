@@ -39,12 +39,14 @@ struct SignalResult
     int highestShift;   // Agar sell hast balatarin noghte ghable vorod
     int lowestShift;    // Agar buy hast payintarin noghte ghable vorod
     int moveDepthShift; // Cheghadr move zade
+    bool valid;
     SignalResult()
     {
         maChangeShift = -1;
         highestShift = -1;
         lowestShift = -1;
         moveDepthShift = -1;
+        valid = false;
     }
 };
 
