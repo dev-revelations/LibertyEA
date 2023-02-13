@@ -332,6 +332,8 @@ bool deletePendingIfExceededTPThreshold()
     double orderPrice = OrderOpenPrice();
     double ask = MarketInfo(symbol, MODE_ASK);
 
+    int groupIndex = OrderMagicNumber() % 10;
+
     const double validationBreakevenSize = MathAbs(orderPrice - SL) * ValidationTpHitSizeAcsRatio;
 
     bool typeSell = OP == OP_SELLLIMIT || OP == OP_SELLSTOP;
@@ -343,11 +345,23 @@ bool deletePendingIfExceededTPThreshold()
     {
         double deleteBreakevenPrice = orderPrice - validationBreakevenSize;
         shouldDelete = ask <= deleteBreakevenPrice;
+
+        if (shouldDelete && GROUPS[groupIndex].passive_hit_symbol_sell == "")
+        {
+            GROUPS[groupIndex].passive_hit_time_sell = OrderOpenTime();
+            GROUPS[groupIndex].passive_hit_symbol_sell = OrderSymbol();
+        }
     }
     else if (typeBuy)
     {
         double deleteBreakevenPrice = orderPrice + validationBreakevenSize;
         shouldDelete = ask >= deleteBreakevenPrice;
+
+        if (shouldDelete && GROUPS[groupIndex].passive_hit_symbol_buy == "")
+        {
+            GROUPS[groupIndex].passive_hit_time_buy = OrderOpenTime();
+            GROUPS[groupIndex].passive_hit_symbol_buy = OrderSymbol();
+        }
     }
 
     bool couldDelete = false;
@@ -566,21 +580,59 @@ void syncActiveSymbolOrders()
             }
         }
 
-        // Delete group pendings if we have active symbols
+        // Delete group pendings if we have active symbols or passive hits
         for (int symIndex = 0; symIndex < group.symbols_count; symIndex++)
         {
             string sym = group.symbols[symIndex];
-
-            if (sym != group.active_symbol_sell && sym != group.active_symbol_buy && selectOpenOrderTicketFor(sym, groupIdx) > -1)
+            if (selectOpenOrderTicketFor(sym, groupIdx) > -1)
             {
-                int OP = OrderType();
-                bool shouldDelete = ((OP == OP_BUYSTOP || OP == OP_BUYLIMIT) && group.active_symbol_buy != "");
-                shouldDelete = shouldDelete || ((OP == OP_SELLSTOP || OP == OP_SELLLIMIT) && group.active_symbol_sell != "");
-                if (shouldDelete)
+                if (sym != group.active_symbol_sell && sym != group.active_symbol_buy)
                 {
-                    OrderDelete(OrderTicket(), clrAzure);
-                    debug("Active Symbol Found - Deleting Pending: Group" + IntegerToString(groupIdx) + " (" + getOpName(OP) + ") " + sym);
+                    int OP = OrderType();
+                    bool shouldDelete = ((OP == OP_BUYSTOP || OP == OP_BUYLIMIT) && group.active_symbol_buy != "");
+                    shouldDelete = shouldDelete || ((OP == OP_SELLSTOP || OP == OP_SELLLIMIT) && group.active_symbol_sell != "");
+                    if (shouldDelete)
+                    {
+                        bool result = OrderDelete(OrderTicket(), clrAzure);
+                        debug("Active Symbol Found - Deleting Pending: Group" + IntegerToString(groupIdx) + " (" + getOpName(OP) + ") " + sym);
+                    }
                 }
+
+                if (sym != group.passive_hit_symbol_sell && sym != group.passive_hit_symbol_buy)
+                {
+                    int OP = OrderType();
+                    bool shouldDelete = ((OP == OP_BUYSTOP || OP == OP_BUYLIMIT) && group.passive_hit_symbol_buy != "");
+                    shouldDelete = shouldDelete || ((OP == OP_SELLSTOP || OP == OP_SELLLIMIT) && group.passive_hit_symbol_sell != "");
+                    if (shouldDelete)
+                    {
+                        bool result = OrderDelete(OrderTicket(), clrAzure);
+                        debug("Passive hit Found - Deleting Pending: Group" + IntegerToString(groupIdx) + " (" + getOpName(OP) + ") " + sym);
+                    }
+                }
+            }
+        }
+
+        if (group.passive_hit_symbol_buy != "")
+        {
+            int hitSession = getSessionNumber(group.passive_hit_time_buy);
+            int currentSession = getSessionNumber(TimeCurrent());
+            if (!sessionsEqual(hitSession, currentSession))
+            {
+                debug("Clearing Passive Hit Buy For " + group.passive_hit_symbol_buy);
+                group.passive_hit_symbol_buy = "";
+                group.passive_hit_time_buy = 0;
+            }
+        }
+
+        if (group.passive_hit_symbol_sell != "")
+        {
+            int hitSession = getSessionNumber(group.passive_hit_time_sell);
+            int currentSession = getSessionNumber(TimeCurrent());
+            if (!sessionsEqual(hitSession, currentSession))
+            {
+                debug("Clearing Passive Hit Sell For " + group.passive_hit_symbol_sell);
+                group.passive_hit_symbol_sell = "";
+                group.passive_hit_time_sell = 0;
             }
         }
 

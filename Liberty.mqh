@@ -124,6 +124,10 @@ struct GroupStruct
     MA_Array MA5[];
     MA_Array MA10[];
     int groupIndex;
+    datetime passive_hit_time_buy;
+    datetime passive_hit_time_sell;
+    string passive_hit_symbol_buy;
+    string passive_hit_symbol_sell;
 
     GroupStruct()
     {
@@ -131,6 +135,8 @@ struct GroupStruct
         active_symbol_sell = "";
         symbols_count = 0;
         groupIndex = -1;
+        passive_hit_symbol_buy = "";
+        passive_hit_symbol_sell = "";
     }
 };
 

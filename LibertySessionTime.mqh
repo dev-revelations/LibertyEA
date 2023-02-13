@@ -1,6 +1,7 @@
 /////////////////////////// Time & Session Helpers ///////////////////////////
 int simulationTimer = 0;
 int simulationOrderLineTimer = 0;
+int hitScanTimer = 0;
 
 bool TimeFilter(int start_time, int end_time, int customTimeHour = -1)
 {

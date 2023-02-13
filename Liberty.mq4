@@ -18,7 +18,7 @@ extern int AverageCandleSizePeriod = 40;
 extern double PendingThresholdAverageCandleSizeRatio = 2.25;             // Pending Threshold In Average Candle Size Ratio
 extern int CustomACSTimeStart = 0;                                       // Custom Pending ACS Start
 extern int CustomACSTimeEnd = 7;                                         // Custom Pending ACS End
-extern double CustomPendingThresholdAverageCandleSizeRatio = 3.75;       // Custom Time Pending Threshold In Average Candle Size Ratio
+extern double CustomPendingThresholdAverageCandleSizeRatio = 3;          // Custom Time Pending Threshold In Average Candle Size Ratio
 extern double CustomTimeHigherMAThicknessRatio = 0.4;                    // Custom Time Higher MA Thickness Ratio in ACS
 extern string _separator1_3 = "======================================="; // ===== Validation Settings =====
 extern double ValidationTpHitSizeAcsRatio = 2.75;                        // Validation TP Hit Size In ACS
@@ -71,7 +71,7 @@ extern bool ShowLinesForOpenedOrders = false; // Show lines for opened orders
 extern int RefreshEverySeconds = 20;          // Refresh Every X seconds
 extern int TestSkipToTime = -1;               // Skips Test To The Market Hour Defined
 
-const int accountLogin = 44572110;
+const int accountLogin = 44607060;
 //////////////////////////////////////////////////////////////////////////////
 #include <WinUser32.mqh>
 #include "Liberty.mqh"
@@ -154,6 +154,11 @@ void runEA()
       initializeMAs();
     }
 
+    if (secondsPassed(60, hitScanTimer))
+    {
+      scanForPassiveHits();
+    }
+
     scanSymbolGroups();
   }
 
@@ -165,6 +170,8 @@ void scanSymbolGroups()
 {
   string activeSymbolsListBuy = "";
   string activeSymbolsListSell = "";
+  string passiveSymbolsListBuy = "";
+  string passiveSymbolsListSell = "";
 
   bool canRefreshSimulation = secondsPassed(RefreshEverySeconds, simulationTimer);
 
@@ -185,6 +192,16 @@ void scanSymbolGroups()
     if (group.active_symbol_sell != "")
     {
       activeSymbolsListSell += "Group(" + IntegerToString(groupIdx) + ") = " + group.active_symbol_sell + "\n";
+    }
+
+    if (group.passive_hit_symbol_buy != "")
+    {
+      passiveSymbolsListBuy += "Group(" + IntegerToString(groupIdx) + ") = " + group.passive_hit_symbol_buy + "\n";
+    }
+
+    if (group.passive_hit_symbol_sell != "")
+    {
+      passiveSymbolsListSell += "Group(" + IntegerToString(groupIdx) + ") = " + group.passive_hit_symbol_sell + "\n";
     }
 
     ////////////// Scanning Symbols In The Current Group //////////////
@@ -216,12 +233,12 @@ void scanSymbolGroups()
         }
       }
 
-      if (group.active_symbol_buy != "" && group.active_symbol_sell != "")
+      if ((group.active_symbol_buy != "" && group.active_symbol_sell != "") || (group.passive_hit_symbol_buy != "" && group.passive_hit_symbol_sell != ""))
       {
         continue;
       }
 
-      if (group.active_symbol_buy == symbol || group.active_symbol_sell == symbol)
+      if (group.active_symbol_buy == symbol || group.active_symbol_sell == symbol || group.passive_hit_symbol_buy == symbol || group.passive_hit_symbol_sell == symbol)
       {
         continue;
       }
@@ -245,9 +262,14 @@ void scanSymbolGroups()
       */
       if ((status == STRATEGY_STATUS_IMMEDIATE_BUY || status == STRATEGY_STATUS_PENDING_BUY))
       {
+
+        if (group.passive_hit_symbol_buy != "")
+        {
+          continue;
+        }
+
         if (group.active_symbol_buy == "")
         {
-          // group.active_symbol_buy = symbol;
           if (result.orderInfo.valid)
           {
             addOrderPriority(result, OP_BUY);
@@ -261,9 +283,13 @@ void scanSymbolGroups()
       }
       else if ((status == STRATEGY_STATUS_IMMEDIATE_SELL || status == STRATEGY_STATUS_PENDING_SELL))
       {
+        if (group.passive_hit_symbol_sell != "")
+        {
+          continue;
+        }
+
         if (group.active_symbol_sell == "")
         {
-          // group.active_symbol_sell = symbol;
           if (result.orderInfo.valid)
           {
             addOrderPriority(result, OP_SELL);
@@ -285,9 +311,17 @@ void scanSymbolGroups()
     if (group.active_strategy_sell.symbol != "")
       addOrderPriority(group.active_strategy_sell, OP_SELL);
 
-    openPrioritizedOrdersFor(group, OP_BUY);
-    openPrioritizedOrdersFor(group, OP_SELL);
+    if (group.passive_hit_symbol_buy == "" && group.active_symbol_buy == "")
+      openPrioritizedOrdersFor(group, OP_BUY);
 
+    if (group.passive_hit_symbol_sell == "" && group.active_symbol_sell == "")
+      openPrioritizedOrdersFor(group, OP_SELL);
+
+    // Syncing existing updates with new final group updates
+    group.passive_hit_symbol_buy = GROUPS[groupIdx].passive_hit_symbol_buy;
+    group.passive_hit_time_buy = GROUPS[groupIdx].passive_hit_time_buy;
+    group.passive_hit_symbol_sell = GROUPS[groupIdx].passive_hit_symbol_sell;
+    group.passive_hit_time_sell = GROUPS[groupIdx].passive_hit_time_sell;
     GROUPS[groupIdx] = group; // Hatman bayad dobare set shavad ta taghirat emal shavad
   }
 
@@ -296,7 +330,48 @@ void scanSymbolGroups()
       "\nActive Symbols (BUY):\n",
       activeSymbolsListBuy,
       "\nActive Symbols (SELL):\n",
-      activeSymbolsListSell);
+      activeSymbolsListSell,
+      "\n\n\nPassive Hit Symbols (BUY):\n",
+      passiveSymbolsListBuy,
+      "\nPassive Hit Symbols (SELL):\n",
+      passiveSymbolsListSell);
+}
+
+void scanForPassiveHits()
+{
+  for (int groupIdx = 0; groupIdx < GROUPS_LENGTH; groupIdx++)
+  {
+
+    GroupStruct group = GROUPS[groupIdx];
+    ////////////// Scanning Symbols In The Current Group //////////////
+    for (int symbolIdx = 0; symbolIdx < group.symbols_count; symbolIdx++)
+    {
+      string symbol = group.symbols[symbolIdx];
+      if ((IsTesting() || SingleChart) && _Symbol != symbol)
+      {
+        continue;
+      }
+
+      if ((group.active_symbol_buy != "" && group.active_symbol_sell != "") || (group.passive_hit_symbol_buy != "" && group.passive_hit_symbol_sell != ""))
+      {
+        continue;
+      }
+
+      if (group.active_symbol_buy == symbol || group.active_symbol_sell == symbol || group.passive_hit_symbol_buy == symbol || group.passive_hit_symbol_sell == symbol)
+      {
+        continue;
+      }
+
+      StrategyResult result = runStrategy1(symbol, lower_timeframe, higher_timeframe, groupIdx);
+    }
+
+    // Syncing existing updates with new final group updates
+    group.passive_hit_symbol_buy = GROUPS[groupIdx].passive_hit_symbol_buy;
+    group.passive_hit_time_buy = GROUPS[groupIdx].passive_hit_time_buy;
+    group.passive_hit_symbol_sell = GROUPS[groupIdx].passive_hit_symbol_sell;
+    group.passive_hit_time_sell = GROUPS[groupIdx].passive_hit_time_sell;
+    GROUPS[groupIdx] = group; // Hatman bayad dobare set shavad ta taghirat emal shavad
+  }
 }
 
 StrategyResult runStrategy1(string symbol, ENUM_TIMEFRAMES lowTF, ENUM_TIMEFRAMES highTF, int groupIndex)
@@ -377,6 +452,8 @@ OrderInfoResult getSymbolEntry(string symbol, ENUM_TIMEFRAMES currentTF, int fir
 {
   OrderInfoResult result;
 
+  GroupStruct group = GROUPS[groupIndex];
+
   double price = maCross.orderEnvironment == ENV_SELL ? MarketInfo(symbol, MODE_BID) : MarketInfo(symbol, MODE_ASK);
 
   int signalsCount = ArraySize(signals);
@@ -386,7 +463,15 @@ OrderInfoResult getSymbolEntry(string symbol, ENUM_TIMEFRAMES currentTF, int fir
     SignalResult lastSignal = signals[lastSignalIndex];
     // Validate Signal
 
-    OrderInfoResult orderCalculated = validateOrderDistance(symbol, currentTF, maCross.orderEnvironment, firstAreaTouchShift, signals, lastSignalIndex, true);
+    if ((maCross.orderEnvironment == ENV_BUY && group.passive_hit_symbol_buy == "") || (maCross.orderEnvironment == ENV_SELL && group.passive_hit_symbol_sell == ""))
+    {
+      for (int sIdx = 0; sIdx < signalsCount; sIdx++)
+      {
+        validateOrderDistance(symbol, currentTF, maCross.orderEnvironment, firstAreaTouchShift, groupIndex, signals, sIdx, false);
+      }
+    }
+
+    OrderInfoResult orderCalculated = validateOrderDistance(symbol, currentTF, maCross.orderEnvironment, firstAreaTouchShift, groupIndex, signals, lastSignalIndex, true);
 
     // If last signal is hapenning now
     if (lastSignal.maChangeShift >= 0 && lastSignal.maChangeShift <= ImmediateEntryRange && orderCalculated.valid)
@@ -417,7 +502,7 @@ OrderInfoResult getSymbolEntry(string symbol, ENUM_TIMEFRAMES currentTF, int fir
       {
         // if last signal is not hapenning now, find the latest valid signal and set a pending order for it
         int latestValidSignalIndex = findMostValidSignalIndex(symbol, currentTF, maCross.orderEnvironment, signals);
-        OrderInfoResult latestValidOrder = validateOrderDistance(symbol, currentTF, maCross.orderEnvironment, firstAreaTouchShift, signals, latestValidSignalIndex, true);
+        OrderInfoResult latestValidOrder = validateOrderDistance(symbol, currentTF, maCross.orderEnvironment, firstAreaTouchShift, groupIndex, signals, latestValidSignalIndex, true);
         latestValidOrder.valid = latestValidOrder.valid && (maCross.orderEnvironment == ENV_SELL ? (price > latestValidOrder.tpPrice) : (price < latestValidOrder.tpPrice));
         latestValidOrder.pending = true;
         result = latestValidOrder;
@@ -975,7 +1060,7 @@ OrderInfoResult signalToOrderInfo(string symbol, ENUM_TIMEFRAMES tf, OrderEnviro
   return orderCalculated;
 }
 
-OrderInfoResult validateOrderDistance(string symbol, ENUM_TIMEFRAMES tf, OrderEnvironment orderEnv, int firstAreaTouchShift, SignalResult &signals[], int signalIndexToValidate, bool withSpread)
+OrderInfoResult validateOrderDistance(string symbol, ENUM_TIMEFRAMES tf, OrderEnvironment orderEnv, int firstAreaTouchShift, int groupIndex, SignalResult &signals[], int signalIndexToValidate, bool withSpread)
 {
 
   int signalsCount = ArraySize(signals);
@@ -985,6 +1070,12 @@ OrderInfoResult validateOrderDistance(string symbol, ENUM_TIMEFRAMES tf, OrderEn
   OrderInfoResult indexOrderInfo = signalToOrderInfo(symbol, tf, orderEnv, signal, true, withSpread);
 
   indexOrderInfo.valid = false;
+
+  GroupStruct group;
+  if (groupIndex > -1)
+  {
+    group = GROUPS[groupIndex];
+  }
 
   if (signalIndexToValidate >= 0)
   {
@@ -1067,6 +1158,29 @@ OrderInfoResult validateOrderDistance(string symbol, ENUM_TIMEFRAMES tf, OrderEn
             }
           }
 
+          // If had a TP hit we save info into the group to avoid opening related orders
+          if (!isValidPriceDistance && groupIndex > -1)
+          {
+            datetime mostValidSignalTime = iTime(symbol, tf, mostValidEntrySignal.maChangeShift);
+            int mostValidSignalSession = getSessionNumber(mostValidSignalTime);
+            int currentSession = getSessionNumber(TimeCurrent());
+            if (sessionsEqual(mostValidSignalSession, currentSession))
+            {
+              if (orderEnv == ENV_BUY && group.passive_hit_symbol_buy == "" && symbol != group.active_symbol_buy)
+              {
+                group.passive_hit_time_buy = mostValidSignalTime;
+                group.passive_hit_symbol_buy = symbol;
+                debug("Setting Passive Hit For (BUY) " + symbol);
+              }
+              else if (orderEnv == ENV_SELL && group.passive_hit_symbol_sell == "" && symbol != group.active_symbol_sell)
+              {
+                group.passive_hit_time_sell = mostValidSignalTime;
+                group.passive_hit_symbol_sell = symbol;
+                debug("Setting Passive Hit For (SELL) " + symbol);
+              }
+            }
+          }
+
           indexOrderInfo.valid = indexOrderInfo.valid && isValidPriceDistance;
           signal.valid = indexOrderInfo.valid;
 
@@ -1098,6 +1212,29 @@ OrderInfoResult validateOrderDistance(string symbol, ENUM_TIMEFRAMES tf, OrderEn
           double highestPrice = iHigh(symbol, tf, highestCandleFromShift0);
           double signalEntryBreakevenPrice = indexOrderInfo.orderPrice + signalBreakevenSize;
           isValidPriceDistance = (indexOrderInfo.originalPrice < signalEntryBreakevenPrice) && (highestPrice < signalEntryBreakevenPrice);
+        }
+
+        // If had a TP hit we save info into the group to avoid opening related orders
+        if (!isValidPriceDistance && groupIndex > -1)
+        {
+          datetime signalTime = iTime(symbol, tf, signal.maChangeShift);
+          int signalSession = getSessionNumber(signalTime);
+          int currentSession = getSessionNumber(TimeCurrent());
+          if (sessionsEqual(signalSession, currentSession))
+          {
+            if (orderEnv == ENV_BUY && group.passive_hit_symbol_buy == "" && symbol != group.active_symbol_buy)
+            {
+              group.passive_hit_time_buy = signalTime;
+              group.passive_hit_symbol_buy = symbol;
+              debug("Setting Passive Hit For (BUY) " + symbol);
+            }
+            else if (orderEnv == ENV_SELL && group.passive_hit_symbol_sell == "" && symbol != group.active_symbol_sell)
+            {
+              group.passive_hit_time_sell = signalTime;
+              group.passive_hit_symbol_sell = symbol;
+              debug("Setting Passive Hit For (SELL) " + symbol);
+            }
+          }
         }
 
         indexOrderInfo.valid = indexOrderInfo.valid && isValidPriceDistance;
@@ -1137,6 +1274,11 @@ OrderInfoResult validateOrderDistance(string symbol, ENUM_TIMEFRAMES tf, OrderEn
 
       signals[signalIndexToValidate] = signal;
     }
+  }
+
+  if (groupIndex > -1)
+  {
+    GROUPS[groupIndex] = group;
   }
 
   return indexOrderInfo;
