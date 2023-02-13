@@ -44,10 +44,10 @@ extern bool EnableBreakEven = true;                                      // Enab
 extern double BreakEvenRatio = 2.65;                                     // Break Even Ratio
 extern double BreakEvenGapPip = 2;                                       // Break Even Gap Pip
 extern double BuyStopSellStopGapInACS = 0.1;                             // Immediate BuyStop / SellStop Gap in ACS Ratio
-extern int ImmediateEntryRange = 0;                                      // Immediate Order Entry Range Candles
+extern int ImmediateEntryRange = 2;                                      // Immediate Order Entry Range Candles
 extern string _separator2_1 = "======================================="; // ===== Order Management Settings =====
 extern int CustomPendingExecutionStart = 0;                              // Custom Pending Execution Start
-extern int CustomPendingExecutionEnd = 7;                                // Custom Pending Execution End
+extern int CustomPendingExecutionEnd = 17;                                // Custom Pending Execution End
 extern string _separator4 = "=======================================";   // ===== Sessions (Min = 0 , Max = 24) =====
 extern int GMTOffset = 2;                                                // GMT Offset
 extern bool EnableTradingSession1 = true;                                // Enable Trading in Session 1
