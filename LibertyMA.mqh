@@ -1,19 +1,19 @@
 
 const int MA_MAX_LENGTH = 1000;
 
-void initLibertyMA(double &maBuffer[], string symbol, ENUM_TIMEFRAMES TimeFrame, int PERIOD, ENUM_MA_METHOD Method, ENUM_APPLIED_PRICE AppliedPrice)
+void initLibertyMA(double &maBuffer[], string symbol, ENUM_TIMEFRAMES TimeFrame, ENUM_TIMEFRAMES currentTF, int PERIOD, ENUM_MA_METHOD Method, ENUM_APPLIED_PRICE AppliedPrice)
 {
 
-    int currentTFBars = iBars(symbol, Period());
+    int currentTFBars = iBars(symbol, currentTF);
 
     int bars1 = iBars(symbol, TimeFrame),
         start1 = bars1 - 1,
-        limit1 = iBarShift(symbol, TimeFrame, iTime(symbol, Period(), currentTFBars - 1));
+        limit1 = iBarShift(symbol, TimeFrame, iTime(symbol, currentTF, currentTFBars - 1));
 
     if (start1 > limit1 && limit1 != -1)
         start1 = limit1;
 
-    ArrayResize(maBuffer, currentTFBars*2, currentTFBars*2);
+    ArrayResize(maBuffer, currentTFBars * 2, currentTFBars * 2);
     ArrayInitialize(maBuffer, EMPTY_VALUE);
 
     //----
@@ -22,21 +22,23 @@ void initLibertyMA(double &maBuffer[], string symbol, ENUM_TIMEFRAMES TimeFrame,
     {
         int shift1 = i;
 
-        if (TimeFrame < Period())
-            shift1 = iBarShift(symbol, TimeFrame, iTime(symbol, Period(), i));
+        if (TimeFrame < currentTF)
+            shift1 = iBarShift(symbol, TimeFrame, iTime(symbol, currentTF, i));
 
-        if(shift1 < 0) {
+        if (shift1 < 0)
+        {
             continue;
-        } 
+        }
 
-        int time1 = (int) iTime(symbol, TimeFrame, shift1),
-            shift2 = iBarShift(symbol, 0, time1);
+        int time1 = (int)iTime(symbol, TimeFrame, shift1),
+            shift2 = iBarShift(symbol, currentTF, time1);
 
         double ma = iMA(symbol, TimeFrame, PERIOD, 0, Method, AppliedPrice, shift1);
 
-        if(shift2 < 0) {
+        if (shift2 < 0)
+        {
             continue;
-        } 
+        }
 
         //----
         //	old (closed) candles
@@ -47,7 +49,7 @@ void initLibertyMA(double &maBuffer[], string symbol, ENUM_TIMEFRAMES TimeFrame,
 
         //----
         //	current candle
-        if ((TimeFrame >= Period() && shift1 <= 1) || (TimeFrame < Period() && (shift1 == 0 || shift2 == 1)))
+        if ((TimeFrame >= currentTF && shift1 <= 1) || (TimeFrame < currentTF && (shift1 == 0 || shift2 == 1)))
         {
             maBuffer[shift2] = ma;
         }
@@ -55,9 +57,9 @@ void initLibertyMA(double &maBuffer[], string symbol, ENUM_TIMEFRAMES TimeFrame,
         //----
         //	linear interpolatior for the number of intermediate bars, between two higher timeframe candles.
         int n = 1;
-        if (TimeFrame > Period())
+        if (TimeFrame > currentTF)
         {
-            int shift2prev = iBarShift(symbol, 0, iTime(symbol, TimeFrame, shift1 + 1));
+            int shift2prev = iBarShift(symbol, currentTF, iTime(symbol, TimeFrame, shift1 + 1));
 
             if (shift2prev != -1 && shift2prev != shift2)
                 n = shift2prev - shift2;
@@ -98,6 +100,34 @@ void initLibertyMA(double &maBuffer[], string symbol, ENUM_TIMEFRAMES TimeFrame,
 
             ma = iMA(symbol, TimeFrame, PERIOD, 0, Method, AppliedPrice, 0);
 
+            // Find a valid value for shift2+n if it has empty value
+            // To avoid having empty MA values
+            if (maBuffer[shift2 + n] == EMPTY_VALUE)
+            {
+                double validValue = 0;
+                int shiftIdx;
+                for (shiftIdx = shift2 + n; shiftIdx < 200; shiftIdx++)
+                {
+                    if (maBuffer[shiftIdx] != EMPTY_VALUE)
+                    {
+                        validValue = maBuffer[shiftIdx];
+                        break;
+                    }
+                }
+
+                for (shiftIdx = shift2 + n; shiftIdx < 200; shiftIdx++)
+                {
+                    if (maBuffer[shiftIdx] != EMPTY_VALUE)
+                    {
+                        break;
+                    }
+                    else if (maBuffer[shiftIdx] == EMPTY_VALUE)
+                    {
+                        maBuffer[shiftIdx] = validValue;
+                    }
+                }
+            }
+
             /*
                Candle 0 MA shibe nahayie khat ra tayiin mikonad
                banabarin bayad zaribi ra be an ezafe ya kam konim ta shibe ghabele pishbini ra rasm konad
@@ -105,7 +135,9 @@ void initLibertyMA(double &maBuffer[], string symbol, ENUM_TIMEFRAMES TimeFrame,
 
                (MA[n] - MA[current]) * n
             */
-            double diffRatio = MathAbs(maBuffer[n] - ma);// * n;
+            double prevMa = iMA(symbol, TimeFrame, PERIOD, 0, Method, AppliedPrice, 1);
+
+            double diffRatio = MathAbs(prevMa - ma) / 2; ///(n);
 
             if (maBuffer[n] < ma)
             {
@@ -122,12 +154,9 @@ void initLibertyMA(double &maBuffer[], string symbol, ENUM_TIMEFRAMES TimeFrame,
 
             factor = 1.0 / n;
 
-            if (maBuffer[shift2 + n] != EMPTY_VALUE && maBuffer[shift2] != EMPTY_VALUE)
+            for (int k = 1; k < n; k++)
             {
-                for (int k = 1; k < n; k++)
-                {
-                    maBuffer[shift2 + k] = k * factor * maBuffer[shift2 + n] + (1.0 - k * factor) * maBuffer[shift2];
-                }
+                maBuffer[shift2 + k] = k * factor * maBuffer[shift2 + n] + (1.0 - k * factor) * maBuffer[shift2];
             }
         }
     }
